@@ -1,0 +1,276 @@
+-- Star schema of AdventureWorksDW, column for column as in the SQL Server original (names in snake_case).
+CREATE SCHEMA dw;
+
+CREATE TABLE dw.dim_date (
+  date_key integer NOT NULL,
+  full_date_alternate_key date NOT NULL,
+  day_number_of_week smallint NOT NULL,
+  english_day_name_of_week varchar(10) NOT NULL,
+  spanish_day_name_of_week varchar(10) NOT NULL,
+  french_day_name_of_week varchar(10) NOT NULL,
+  day_number_of_month smallint NOT NULL,
+  day_number_of_year smallint NOT NULL,
+  week_number_of_year smallint NOT NULL,
+  english_month_name varchar(10) NOT NULL,
+  spanish_month_name varchar(10) NOT NULL,
+  french_month_name varchar(10) NOT NULL,
+  month_number_of_year smallint NOT NULL,
+  calendar_quarter smallint NOT NULL,
+  calendar_year smallint NOT NULL,
+  calendar_semester smallint NOT NULL,
+  fiscal_quarter smallint NOT NULL,
+  fiscal_year smallint NOT NULL,
+  fiscal_semester smallint NOT NULL
+);
+
+CREATE TABLE dw.dim_currency (
+  currency_key integer NOT NULL,
+  currency_alternate_key char(3) NOT NULL,
+  currency_name varchar(50) NOT NULL
+);
+
+CREATE TABLE dw.dim_sales_territory (
+  sales_territory_key integer NOT NULL,
+  sales_territory_alternate_key integer,
+  sales_territory_region varchar(50) NOT NULL,
+  sales_territory_country varchar(50) NOT NULL,
+  sales_territory_group varchar(50),
+  sales_territory_image bytea
+);
+
+CREATE TABLE dw.dim_geography (
+  geography_key integer NOT NULL,
+  city varchar(30),
+  state_province_code varchar(3),
+  state_province_name varchar(50),
+  country_region_code varchar(3),
+  english_country_region_name varchar(50),
+  spanish_country_region_name varchar(50),
+  french_country_region_name varchar(50),
+  postal_code varchar(15),
+  sales_territory_key integer,
+  ip_address_locator varchar(15)
+);
+
+CREATE TABLE dw.dim_product_category (
+  product_category_key integer NOT NULL,
+  product_category_alternate_key integer,
+  english_product_category_name varchar(50) NOT NULL,
+  spanish_product_category_name varchar(50) NOT NULL,
+  french_product_category_name varchar(50) NOT NULL
+);
+
+CREATE TABLE dw.dim_product_subcategory (
+  product_subcategory_key integer NOT NULL,
+  product_subcategory_alternate_key integer,
+  english_product_subcategory_name varchar(50) NOT NULL,
+  spanish_product_subcategory_name varchar(50) NOT NULL,
+  french_product_subcategory_name varchar(50) NOT NULL,
+  product_category_key integer
+);
+
+CREATE TABLE dw.dim_product (
+  product_key integer NOT NULL,
+  product_alternate_key varchar(25),
+  product_subcategory_key integer,
+  weight_unit_measure_code char(3),
+  size_unit_measure_code char(3),
+  english_product_name varchar(50) NOT NULL,
+  spanish_product_name varchar(50) NOT NULL,
+  french_product_name varchar(50) NOT NULL,
+  standard_cost numeric(19,4),
+  finished_goods_flag boolean NOT NULL,
+  color varchar(15) NOT NULL,
+  safety_stock_level smallint,
+  reorder_point smallint,
+  list_price numeric(19,4),
+  size varchar(50),
+  size_range varchar(50),
+  weight double precision,
+  days_to_manufacture integer,
+  product_line char(2),
+  dealer_price numeric(19,4),
+  class char(2),
+  style char(2),
+  model_name varchar(50),
+  large_photo bytea,
+  english_description varchar(400),
+  french_description varchar(400),
+  chinese_description varchar(400),
+  arabic_description varchar(400),
+  hebrew_description varchar(400),
+  thai_description varchar(400),
+  german_description varchar(400),
+  japanese_description varchar(400),
+  turkish_description varchar(400),
+  start_date timestamp(3),
+  end_date timestamp(3),
+  status varchar(7)
+);
+
+CREATE TABLE dw.dim_promotion (
+  promotion_key integer NOT NULL,
+  promotion_alternate_key integer,
+  english_promotion_name varchar(255),
+  spanish_promotion_name varchar(255),
+  french_promotion_name varchar(255),
+  discount_pct double precision,
+  english_promotion_type varchar(50),
+  spanish_promotion_type varchar(50),
+  french_promotion_type varchar(50),
+  english_promotion_category varchar(50),
+  spanish_promotion_category varchar(50),
+  french_promotion_category varchar(50),
+  start_date timestamp(3) NOT NULL,
+  end_date timestamp(3),
+  min_qty integer,
+  max_qty integer
+);
+
+CREATE TABLE dw.dim_customer (
+  customer_key integer NOT NULL,
+  geography_key integer,
+  customer_alternate_key varchar(15) NOT NULL,
+  title varchar(8),
+  first_name varchar(50),
+  middle_name varchar(50),
+  last_name varchar(50),
+  name_style boolean,
+  birth_date date,
+  marital_status char(1),
+  suffix varchar(10),
+  gender varchar(1),
+  email_address varchar(50),
+  yearly_income numeric(19,4),
+  total_children smallint,
+  number_children_at_home smallint,
+  english_education varchar(40),
+  spanish_education varchar(40),
+  french_education varchar(40),
+  english_occupation varchar(100),
+  spanish_occupation varchar(100),
+  french_occupation varchar(100),
+  house_owner_flag char(1),
+  number_cars_owned smallint,
+  address_line1 varchar(120),
+  address_line2 varchar(120),
+  phone varchar(20),
+  date_first_purchase date,
+  commute_distance varchar(15)
+);
+
+CREATE TABLE dw.dim_employee (
+  employee_key integer NOT NULL,
+  parent_employee_key integer,
+  employee_national_id_alternate_key varchar(15),
+  parent_employee_national_id_alternate_key varchar(15),
+  sales_territory_key integer,
+  first_name varchar(50) NOT NULL,
+  last_name varchar(50) NOT NULL,
+  middle_name varchar(50),
+  name_style boolean NOT NULL,
+  title varchar(50),
+  hire_date date,
+  birth_date date,
+  login_id varchar(256),
+  email_address varchar(50),
+  phone varchar(25),
+  marital_status char(1),
+  emergency_contact_name varchar(50),
+  emergency_contact_phone varchar(25),
+  salaried_flag boolean,
+  gender char(1),
+  pay_frequency smallint,
+  base_rate numeric(19,4),
+  vacation_hours smallint,
+  sick_leave_hours smallint,
+  current_flag boolean NOT NULL,
+  sales_person_flag boolean NOT NULL,
+  department_name varchar(50),
+  start_date date,
+  end_date date,
+  status varchar(50),
+  employee_photo bytea
+);
+
+CREATE TABLE dw.dim_reseller (
+  reseller_key integer NOT NULL,
+  geography_key integer,
+  reseller_alternate_key varchar(15),
+  phone varchar(25),
+  business_type varchar(20) NOT NULL,
+  reseller_name varchar(50) NOT NULL,
+  number_employees integer,
+  order_frequency char(1),
+  order_month smallint,
+  first_order_year integer,
+  last_order_year integer,
+  product_line varchar(50),
+  address_line1 varchar(60),
+  address_line2 varchar(60),
+  annual_sales numeric(19,4),
+  bank_name varchar(50),
+  min_payment_type smallint,
+  min_payment_amount numeric(19,4),
+  annual_revenue numeric(19,4),
+  year_opened integer
+);
+
+CREATE TABLE dw.fact_internet_sales (
+  product_key integer NOT NULL,
+  order_date_key integer NOT NULL,
+  due_date_key integer NOT NULL,
+  ship_date_key integer NOT NULL,
+  customer_key integer NOT NULL,
+  promotion_key integer NOT NULL,
+  currency_key integer NOT NULL,
+  sales_territory_key integer NOT NULL,
+  sales_order_number varchar(20) NOT NULL,
+  sales_order_line_number smallint NOT NULL,
+  revision_number smallint NOT NULL,
+  order_quantity smallint NOT NULL,
+  unit_price numeric(19,4) NOT NULL,
+  extended_amount numeric(19,4) NOT NULL,
+  unit_price_discount_pct double precision NOT NULL,
+  discount_amount double precision NOT NULL,
+  product_standard_cost numeric(19,4) NOT NULL,
+  total_product_cost numeric(19,4) NOT NULL,
+  sales_amount numeric(19,4) NOT NULL,
+  tax_amt numeric(19,4) NOT NULL,
+  freight numeric(19,4) NOT NULL,
+  carrier_tracking_number varchar(25),
+  customer_po_number varchar(25),
+  order_date timestamp(3),
+  due_date timestamp(3),
+  ship_date timestamp(3)
+);
+
+CREATE TABLE dw.fact_reseller_sales (
+  product_key integer NOT NULL,
+  order_date_key integer NOT NULL,
+  due_date_key integer NOT NULL,
+  ship_date_key integer NOT NULL,
+  reseller_key integer NOT NULL,
+  employee_key integer NOT NULL,
+  promotion_key integer NOT NULL,
+  currency_key integer NOT NULL,
+  sales_territory_key integer NOT NULL,
+  sales_order_number varchar(20) NOT NULL,
+  sales_order_line_number smallint NOT NULL,
+  revision_number smallint,
+  order_quantity smallint,
+  unit_price numeric(19,4),
+  extended_amount numeric(19,4),
+  unit_price_discount_pct double precision,
+  discount_amount double precision,
+  product_standard_cost numeric(19,4),
+  total_product_cost numeric(19,4),
+  sales_amount numeric(19,4),
+  tax_amt numeric(19,4),
+  freight numeric(19,4),
+  carrier_tracking_number varchar(25),
+  customer_po_number varchar(25),
+  order_date timestamp(3),
+  due_date timestamp(3),
+  ship_date timestamp(3)
+);

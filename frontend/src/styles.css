@@ -1,0 +1,62 @@
+@import '@copilotkit/angular/styles.css';
+
+:root {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --surface-1: #ffffff;
+  --surface-2: #f6f7f9;
+  --border-color: #e3e6eb;
+  --border-strong: #c8cdd6;
+  --text-primary: #0f172a;
+  --text-secondary: #525a6b;
+  --text-muted: #8a91a0;
+  --brand: #2a78d6;
+  --brand-strong: #1c5cab;
+  --brand-soft: #e8f1fc;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-md: 0 8px 20px -8px rgb(15 23 42 / 0.18), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Categorical slots in fixed order (validated for colour-vision deficiencies on adjacent pairs). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+
+  --status-good: #0ca30c;
+  --status-critical: #d03b3b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}

@@ -1,0 +1,100 @@
+# One of two interchangeable data backends is chosen at start-up:
+#   docker compose --profile dotnet up   -> ASP.NET Core + SQL Server 2025
+#   docker compose --profile node up     -> NestJS + PostgreSQL 17
+# Both serve the same HTTP contract from the same AdventureWorksDW data, under the network name
+# data-api. The agent and the web app use whichever one runs. The app is on http://localhost:8080.
+name: agentic-analytics
+
+services:
+  sqlserver:
+    profiles: [dotnet]
+    build: db/sqlserver
+    # Microsoft publishes SQL Server for Linux only for amd64; on Apple Silicon it runs emulated.
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in .env}
+      ANALYTICS_READER_PASSWORD: ${ANALYTICS_READER_PASSWORD:?set ANALYTICS_READER_PASSWORD in .env}
+    ports:
+      - 127.0.0.1:${SQLSERVER_PORT:-14330}:1433
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U AnalyticsReader -P "$$ANALYTICS_READER_PASSWORD" -d AdventureWorksDW -Q "SELECT TOP (1) ProductKey FROM analytics.Products"
+      interval: 5s
+      retries: 60
+
+  postgres:
+    profiles: [node]
+    build: db/postgres
+    environment:
+      POSTGRES_DB: adventureworks
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      ANALYTICS_READER_PASSWORD: ${ANALYTICS_READER_PASSWORD:?set ANALYTICS_READER_PASSWORD in .env}
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5434}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # TCP only accepts connections once the first-start import has finished.
+      test:
+        - CMD-SHELL
+        - PGPASSWORD="$$ANALYTICS_READER_PASSWORD" psql -h localhost -U analytics_reader -d adventureworks -c "SELECT 1 FROM analytics.products LIMIT 1"
+      interval: 5s
+      retries: 60
+
+  dotnet-api:
+    profiles: [dotnet]
+    build: backends/dotnet
+    environment:
+      ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
+      DATA_SCOPE: ${DATA_SCOPE:-*}
+    ports:
+      - 127.0.0.1:8081:8080
+    networks:
+      default:
+        aliases: [data-api]
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  node-api:
+    profiles: [node]
+    build: backends/node
+    environment:
+      DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
+      DATA_SCOPE: ${DATA_SCOPE:-*}
+    ports:
+      - 127.0.0.1:8082:8080
+    networks:
+      default:
+        aliases: [data-api]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent:
+    profiles: [dotnet, node]
+    build: agent
+    # MODEL and the provider's API key, see agent/.env.example.
+    env_file:
+      - path: agent/.env
+        required: false
+    environment:
+      DATA_API_URL: http://data-api:8080
+    ports:
+      - 127.0.0.1:4111:4111
+
+  web:
+    profiles: [dotnet, node]
+    build: frontend
+    ports:
+      - 127.0.0.1:${WEB_PORT:-8080}:80
+    depends_on: [agent]
+
+volumes:
+  sqlserver-data:
+  postgres-data:

@@ -1,0 +1,67 @@
+.card {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pin {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--brand-strong);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pin:hover:enabled {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.pin:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.loading,
+.error {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--text-secondary);
+}
+
+.pulse {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}

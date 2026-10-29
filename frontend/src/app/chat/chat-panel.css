@@ -1,0 +1,48 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-color);
+  background: var(--surface-1);
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.examples button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.examples button:hover {
+  border-color: var(--brand);
+  color: var(--brand-strong);
+}
+
+copilot-chat {
+  flex: 1;
+  min-height: 0;
+}
+
+.run-error {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #f3c9c9;
+  border-radius: var(--radius-md);
+  background: #fdf3f3;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}

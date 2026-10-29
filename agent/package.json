@@ -1,0 +1,24 @@
+{
+  "name": "agentic-analytics-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ag-ui/client": "1.0.3",
+    "@ag-ui/core": "1.0.3",
+    "@ag-ui/mastra": "2.0.1",
+    "@mastra/core": "1.79.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "zod": "$zod"
+  }
+}

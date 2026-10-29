@@ -1,0 +1,106 @@
+.rows {
+  display: grid;
+  gap: 2px;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(6rem, 34%) 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.2rem 0.25rem;
+  border-radius: var(--radius-sm);
+}
+
+.row.active {
+  background: var(--surface-2);
+}
+
+.category {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding-block: 1px;
+}
+
+.baseline {
+  position: absolute;
+  inset-block: 0;
+  width: 1px;
+  background: var(--border-strong);
+}
+
+.bar-line {
+  position: relative;
+  height: 14px;
+}
+
+.track:has(.bar-line + .bar-line) .bar-line {
+  height: 8px;
+}
+
+.bar {
+  position: absolute;
+  inset-block: 0;
+  min-width: 1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.bar.negative {
+  border-radius: 4px 0 0 4px;
+}
+
+.tip {
+  position: absolute;
+  top: 50%;
+  padding-inline: 0.35rem;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.tip.negative {
+  transform: translate(-100%, -50%);
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  left: 34%;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 12rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-md);
+  font-size: 0.8125rem;
+  pointer-events: none;
+}
+
+.tooltip-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.key {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+}
