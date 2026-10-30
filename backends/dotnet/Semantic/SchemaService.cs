@@ -37,6 +37,23 @@ public sealed class SchemaService(IServiceScopeFactory scopes, DataScope scope)
         }
     }
 
+    /// <summary>The database may still be importing when the backend starts, so the first load is retried.</summary>
+    public async Task<SchemaResponse> WaitForSchemaAsync(ILogger logger)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await GetAsync();
+            }
+            catch (Exception) when (attempt < 60)
+            {
+                logger.LogInformation("Waiting for the database …");
+                await Task.Delay(TimeSpan.FromSeconds(5));
+            }
+        }
+    }
+
     private async Task<SchemaResponse> LoadAsync()
     {
         // One DbContext per query, so the queries run side by side.

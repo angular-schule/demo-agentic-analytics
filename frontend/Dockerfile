@@ -6,5 +6,5 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.29-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/agentic-analytics/browser /usr/share/nginx/html

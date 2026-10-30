@@ -17,25 +17,29 @@ public static class CatalogEndpoints
     private const int DefaultLimit = 20;
     private const int MaxLimit = 200;
 
+    /// <summary>Products by part of the name and by category, for GET /api/products and the agent's tool findProducts.</summary>
+    public static Task<List<ProductSummary>> SearchProductsAsync(AnalyticsContext db, string? search, string? category, int limit, CancellationToken ct)
+    {
+        var query = db.Products.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(p => p.ProductName.Contains(search));
+        }
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query = query.Where(p => p.ProductCategory == category);
+        }
+        return query
+            .OrderBy(p => p.ProductName).ThenBy(p => p.ProductKey)
+            .Take(Math.Clamp(limit, 1, MaxLimit))
+            .Select(p => new ProductSummary(p.ProductKey, p.ProductName, p.ProductSubcategory, p.ProductCategory, p.Color, p.ListPrice, p.LargePhoto != null))
+            .ToListAsync(ct);
+    }
+
     public static void MapCatalogEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/products", async (AnalyticsContext db, string? search, string? category, int? limit, CancellationToken ct) =>
-        {
-            var query = db.Products.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                query = query.Where(p => p.ProductName.Contains(search));
-            }
-            if (!string.IsNullOrWhiteSpace(category))
-            {
-                query = query.Where(p => p.ProductCategory == category);
-            }
-            return await query
-                .OrderBy(p => p.ProductName).ThenBy(p => p.ProductKey)
-                .Take(Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit))
-                .Select(p => new ProductSummary(p.ProductKey, p.ProductName, p.ProductSubcategory, p.ProductCategory, p.Color, p.ListPrice, p.LargePhoto != null))
-                .ToListAsync(ct);
-        });
+        api.MapGet("/products", (AnalyticsContext db, string? search, string? category, int? limit, CancellationToken ct) =>
+            SearchProductsAsync(db, search, category, limit ?? DefaultLimit, ct));
 
         api.MapGet("/products/{productKey:int}", async Task<Results<Ok<ProductDetail>, NotFound>> (AnalyticsContext db, int productKey, CancellationToken ct) =>
         {

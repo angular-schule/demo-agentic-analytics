@@ -41,5 +41,7 @@ export interface DataBackendHealth {
 }
 
 export interface AgentInfo {
+  /** Mastra or Microsoft Agent Framework. */
+  framework: string;
   model: string;
 }

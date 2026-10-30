@@ -14,6 +14,13 @@ export class EnvironmentVariables {
   @IsIn(DATA_SCOPES)
   DATA_SCOPE!: DataScope;
 
+  /**
+   * The agent's model as a Mastra model-router string: provider, slash, model. The provider's API key
+   * comes from its usual environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY).
+   */
+  @IsString()
+  MODEL = 'anthropic/claude-sonnet-5-5';
+
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(1)

@@ -55,6 +55,20 @@ const productSummaryColumns = {
   hasPhoto: sql<boolean>`${products.largePhoto} is not null`,
 };
 
+/** Products by part of the name and by category, for GET /api/products and the agent's tool findProducts. */
+export function searchProducts(drizzle: DrizzleService, search: string | undefined, category: string | undefined, limit: number): Promise<ProductSummary[]> {
+  const conditions: SQL[] = [];
+  if (search?.trim()) conditions.push(ilike(products.productName, containsPattern(search)));
+  if (category?.trim()) conditions.push(eq(products.productCategory, category));
+
+  return drizzle.db
+    .select(productSummaryColumns)
+    .from(products)
+    .where(and(...conditions))
+    .orderBy(asc(products.productName), asc(products.productKey))
+    .limit(limit);
+}
+
 /** Product catalogue and reseller directory: plain lookups next to the aggregations. */
 @ApiTags('catalog')
 @Controller('api')
@@ -71,16 +85,7 @@ export class CatalogController {
     @Query('category') category?: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<ProductSummary[]> {
-    const conditions: SQL[] = [];
-    if (search?.trim()) conditions.push(ilike(products.productName, containsPattern(search)));
-    if (category?.trim()) conditions.push(eq(products.productCategory, category));
-
-    return this.drizzle.db
-      .select(productSummaryColumns)
-      .from(products)
-      .where(and(...conditions))
-      .orderBy(asc(products.productName), asc(products.productKey))
-      .limit(clampLimit(limit));
+    return searchProducts(this.drizzle, search, category, clampLimit(limit));
   }
 
   @Get('products/:productKey')

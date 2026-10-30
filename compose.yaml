@@ -1,8 +1,11 @@
 # One of two interchangeable data backends is chosen at start-up:
-#   docker compose --profile dotnet up   -> ASP.NET Core + SQL Server 2025
-#   docker compose --profile node up     -> NestJS + PostgreSQL 17
+#   docker compose --profile dotnet up   -> ASP.NET Core + SQL Server 2025, agent: Microsoft Agent Framework
+#   docker compose --profile node up     -> NestJS + PostgreSQL 17, agent: Mastra
 # Both serve the same HTTP contract from the same AdventureWorksDW data, under the network name
-# data-api. The agent and the web app use whichever one runs. The app is on http://localhost:8080.
+# data-api, and the agent under /agent in the same process. The app is on http://localhost:8080.
+#
+# The agent as a separate Mastra service in front of either backend:
+#   AGENT_URL=http://agent:4111 docker compose --profile node --profile agent up
 name: agentic-analytics
 
 services:
@@ -52,6 +55,10 @@ services:
     environment:
       ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
       DATA_SCOPE: ${DATA_SCOPE:-*}
+    # MODEL and the provider's API key, see agent/.env.example. This backend talks to Anthropic only.
+    env_file:
+      - path: agent/.env
+        required: false
     ports:
       - 127.0.0.1:8081:8080
     networks:
@@ -67,6 +74,10 @@ services:
     environment:
       DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
       DATA_SCOPE: ${DATA_SCOPE:-*}
+    # MODEL and the provider's API key, see agent/.env.example.
+    env_file:
+      - path: agent/.env
+        required: false
     ports:
       - 127.0.0.1:8082:8080
     networks:
@@ -77,7 +88,7 @@ services:
         condition: service_healthy
 
   agent:
-    profiles: [dotnet, node]
+    profiles: [agent]
     build: agent
     # MODEL and the provider's API key, see agent/.env.example.
     env_file:
@@ -91,9 +102,11 @@ services:
   web:
     profiles: [dotnet, node]
     build: frontend
+    environment:
+      # Where /agent goes: the data backend by default, the separate agent service with --profile agent.
+      AGENT_URL: ${AGENT_URL:-http://data-api:8080}
     ports:
       - 127.0.0.1:${WEB_PORT:-8080}:80
-    depends_on: [agent]
 
 volumes:
   sqlserver-data:

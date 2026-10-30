@@ -57,7 +57,8 @@ export class App {
 
   protected readonly model = computed(() => {
     if (!this.agent.hasValue()) return this.agent.error() ? 'Agent offline' : 'Agent …';
-    return this.agent.value().model;
+    const { framework, model } = this.agent.value();
+    return `${framework} · ${model}`;
   });
 
   protected readonly scope = computed(() => {

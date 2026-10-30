@@ -80,7 +80,7 @@ const server = createServer((request, response) => {
   if (request.method === 'OPTIONS') {
     response.writeHead(204).end();
   } else if (request.method === 'GET' && path === '/agent/info') {
-    sendJson(response, 200, { model: MODEL });
+    sendJson(response, 200, { framework: 'Mastra', model: MODEL });
   } else if (request.method === 'POST' && path === `/agent/ag-ui/${AGENT_ID}`) {
     runAgent(request, response).catch((error: unknown) => {
       console.error(error);

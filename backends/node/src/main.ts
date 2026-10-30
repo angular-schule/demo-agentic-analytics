@@ -1,4 +1,8 @@
 import 'reflect-metadata';
+
+// Mastra reports usage to PostHog unless this is set before the first agent run.
+process.env['MASTRA_TELEMETRY_DISABLED'] ??= '1';
+
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';

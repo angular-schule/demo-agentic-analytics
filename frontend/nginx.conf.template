@@ -1,4 +1,5 @@
 # Serves the Angular app and forwards the two APIs, so the browser talks to one origin only.
+# The nginx image fills in ${AGENT_URL} when the container starts.
 server {
   listen 80;
   root /usr/share/nginx/html;
@@ -10,7 +11,7 @@ server {
   # Docker's DNS, asked at request time: the backends may start later or restart.
   resolver 127.0.0.11 valid=10s;
   set $data_api http://data-api:8080;
-  set $agent http://agent:4111;
+  set $agent ${AGENT_URL};
 
   location ^~ /api/ {
     proxy_pass $data_api;

@@ -1,10 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AgenticAnalytics.Api.Agent;
 using AgenticAnalytics.Api.Data;
 using AgenticAnalytics.Api.Endpoints;
 using AgenticAnalytics.Api.Semantic;
+using Anthropic;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +25,7 @@ builder.Services.AddDbContext<AnalyticsContext>(options => options
 builder.Services.AddScoped<SalesAggregator>();
 builder.Services.AddSingleton<SchemaService>();
 builder.Services.AddProblemDetails();
+builder.Services.AddAGUIServer();
 builder.Services.AddExceptionHandler<InvalidQueryHandler>();
 // Numbers are numbers: no "12" for 12, so the OpenAPI document says integer, not integer or string.
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
@@ -83,7 +88,45 @@ analytics.MapPost("/sales/aggregate", (SalesAggregator aggregator, AggregateRequ
     .ProducesProblem(StatusCodes.Status400BadRequest);
 app.MapGroup("/api").WithTags("catalog").MapCatalogEndpoints();
 
+// The agent runs in this process when a model is configured: AG-UI under /agent, like the separate
+// Mastra service, so the Angular app does not notice which one answers.
+var model = ModelSettings.Read(app.Configuration, out var reason);
+if (model is null)
+{
+    app.Logger.LogWarning("The agent is not served by this backend: {Reason}", reason);
+}
+else
+{
+    var schema = await app.Services.GetRequiredService<SchemaService>().WaitForSchemaAsync(app.Logger);
+    var chatClient = new AnthropicClient { ApiKey = model.ApiKey }.AsIChatClient(model.Name);
+    var analyst = AnalystAgent.Create(chatClient, schema, app.Services.GetRequiredService<IServiceScopeFactory>(), app.Logger);
+    app.MapAGUIServer($"/agent/ag-ui/{AnalystAgent.Id}", analyst).ExcludeFromDescription();
+    app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = model.Id }).ExcludeFromDescription();
+}
+
 app.Run();
+
+/// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5.</param>
+internal sealed record ModelSettings(string Id, string Name, string ApiKey)
+{
+    public static ModelSettings? Read(IConfiguration configuration, out string reason)
+    {
+        const string provider = "anthropic/";
+        var id = configuration["MODEL"] ?? "anthropic/claude-sonnet-5-5";
+        reason = "";
+        if (!id.StartsWith(provider, StringComparison.Ordinal))
+        {
+            reason = $"MODEL '{id}' is not an Anthropic model; this backend talks to Anthropic only.";
+            return null;
+        }
+        if (configuration["ANTHROPIC_API_KEY"] is not { Length: > 0 } apiKey)
+        {
+            reason = "ANTHROPIC_API_KEY is not set.";
+            return null;
+        }
+        return new ModelSettings(id, id[provider.Length..], apiKey);
+    }
+}
 
 internal sealed record HealthResponse(string Status, string Backend, string Database, string Scope);
 

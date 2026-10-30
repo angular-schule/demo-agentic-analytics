@@ -12,7 +12,8 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 
 - **Generative UI with Angular and CopilotKit.** The agent's tool calls are rendered as Angular components: line, bar and stat charts, tables, and product cards with photos.
 - **AG-UI** as the protocol between the Angular app and the agent, streamed as server-sent events.
-- **A Mastra agent** whose tools are generated from the semantic layer of the data backend, so the model only knows names that really exist.
+- **The same agent, built twice:** with Mastra (TypeScript) and with the Microsoft Agent Framework (C#). Same system prompt, same two tools, and the tool schemas are generated from the semantic layer, so the model only knows names that exist. The Angular app draws both alike.
+- **The agent in the data backend or as a separate service.** By default it runs in the backend's process: Mastra inside NestJS, the Microsoft Agent Framework inside ASP.NET Core. A separate Mastra service in front of either backend is one profile away.
 - **A semantic layer instead of SQL.** The model chooses measures, dimensions and filters. It never writes SQL; the backends validate every request and pass values as parameters.
 - **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
 - **Two interchangeable data backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
@@ -20,24 +21,32 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 
 ## Architecture
 
+Default: the agent runs in the data backend.
+
 ```
 Browser (Angular + CopilotKit)
-  │  /agent  AG-UI over SSE            /api  pinned tiles, product photos
-  ▼                                     ▼
-Agent (Mastra, Node.js) ── /api ──▶ Data backend (one of)
-  │                                   ├─ ASP.NET Core + EF Core ─▶ SQL Server 2025
-  ▼                                   └─ NestJS + Drizzle ───────▶ PostgreSQL 17
-LLM provider (Anthropic, OpenAI or Google)
+  │  /agent  AG-UI over SSE    /api  pinned tiles, product photos
+  ▼                            ▼
+Data backend (one of) ──────────────────────────────▶ LLM provider
+  ├─ ASP.NET Core + Microsoft Agent Framework + EF Core ─▶ SQL Server 2025
+  └─ NestJS + Mastra + Drizzle ──────────────────────────▶ PostgreSQL 17
+```
+
+With the profile `agent`: a separate Mastra service between browser and backend.
+
+```
+Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Data backend (one of)
+   └────── /api ──────────────────────────────────────────▶
 ```
 
 | Folder | Content |
 | --- | --- |
 | `frontend/` | Angular app with CopilotKit, served by nginx in the container |
-| `agent/` | Mastra agent with an AG-UI endpoint |
-| `backends/dotnet/` | ASP.NET Core minimal API, EF Core, SQL Server |
-| `backends/node/` | NestJS on Fastify, Drizzle, postgres.js |
+| `agent/` | Mastra agent as a separate service with an AG-UI endpoint |
+| `backends/dotnet/` | ASP.NET Core minimal API, EF Core, SQL Server; the agent with the Microsoft Agent Framework in `Agent/` |
+| `backends/node/` | NestJS on Fastify, Drizzle, postgres.js; the agent with Mastra in `src/agent/` |
 | `db/` | Database images: import of AdventureWorksDW, analytics views, read-only role |
-| `contract/` | Tests that send the same requests to both backends and compare the answers |
+| `contract/` | Tests that compare both backends: OpenAPI documents, answers, and the agent endpoint |
 
 ## Quick start
 
@@ -47,9 +56,15 @@ Requirements: Docker with Compose, and an API key of an LLM provider.
 cp .env.example .env              # database passwords and the data scope
 cp agent/.env.example agent/.env  # model and API key
 
-docker compose --profile node up --build     # NestJS + PostgreSQL
+docker compose --profile node up --build     # NestJS + Mastra + PostgreSQL
 # or
-docker compose --profile dotnet up --build   # ASP.NET Core + SQL Server
+docker compose --profile dotnet up --build   # ASP.NET Core + Microsoft Agent Framework + SQL Server
+```
+
+The agent as a separate Mastra service, in front of either backend:
+
+```bash
+AGENT_URL=http://agent:4111 docker compose --profile node --profile agent up --build
 ```
 
 Then open <http://localhost:8080>. The data backend's Swagger UI opens at <http://localhost:8081> (.NET) or <http://localhost:8082> (Node).
@@ -58,7 +73,8 @@ SQL Server is published for amd64 only; on Apple Silicon it runs emulated and ne
 
 ### Switching the model
 
-The agent uses Mastra's model router: set `MODEL` in `agent/.env` to `provider/model` and add the provider's key.
+`agent/.env` configures the agent, wherever it runs. Set `MODEL` to `provider/model` and add the provider's key.
+Mastra's model router knows all three providers below; the ASP.NET Core backend talks to Anthropic only, through Anthropic's .NET SDK.
 
 ```bash
 MODEL=anthropic/claude-sonnet-5-5   # ANTHROPIC_API_KEY
@@ -81,12 +97,17 @@ docker compose --profile node up postgres
 cd backends/node && npm ci && npm run build && \
   DATABASE_URL=postgres://analytics_reader:<password>@127.0.0.1:5434/adventureworks PORT=8082 npm start
 
-cd agent && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start
-
 cd frontend && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start   # http://localhost:4200
 ```
 
-With both backends running (.NET on 8081, Node on 8082), the contract tests compare their OpenAPI documents and their answers:
+The backend reads `MODEL` and the API key from its environment. For the separate agent service instead:
+
+```bash
+cd agent && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start
+cd frontend && DATA_API_URL=http://127.0.0.1:8082 AGENT_URL=http://127.0.0.1:4111 npm start
+```
+
+With both backends running (.NET on 8081, Node on 8082, each with a model key), the contract tests compare their OpenAPI documents, their answers and their agent endpoints:
 
 ```bash
 node --test 'contract/*.test.mjs'
@@ -101,6 +122,6 @@ Downloads are pinned to a commit and checked against SHA-256 checksums.
 ## Privacy notes
 
 - The browser talks to one origin only. The app loads no fonts, scripts or telemetry from third parties.
-- Mastra sends usage telemetry by default; the agent switches it off (`MASTRA_TELEMETRY_DISABLED`).
+- Mastra sends usage telemetry by default; the agent service and the NestJS backend switch it off (`MASTRA_TELEMETRY_DISABLED`).
 - The CopilotKit Inspector, which reports usage when opened, is disabled.
 - Whatever a tool returns goes to the LLM provider. That is why the semantic layer contains no personal data in the first place.

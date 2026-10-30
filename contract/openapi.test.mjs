@@ -79,3 +79,11 @@ test('both backends open Swagger UI at their root', async () => {
     assert.equal(new URL(response.headers.get('location') ?? '', base).pathname, '/swagger', base);
   }
 });
+
+// The agent runs in each backend (Mastra in NestJS, Microsoft Agent Framework in ASP.NET Core) and needs
+// a model key, see agent/.env.example.
+test('both backends serve the agent under /agent', async () => {
+  const infos = await Promise.all(Object.values(backends).map(async (base) => (await fetch(`${base}/agent/info`)).json()));
+  assert.deepEqual(infos.map((info) => info.framework).sort(), ['Mastra', 'Microsoft Agent Framework']);
+  assert.equal(infos[0].model, infos[1].model);
+});
