@@ -4,6 +4,7 @@ import { SalesChart } from '../charts/sales-chart';
 import { DashboardStore } from '../dashboard/dashboard-store';
 import type { AggregateResponse } from '../data/sales-api';
 import { type SalesView, salesViewSchema } from '../data/sales-view';
+import { readToolResult } from './tool-result';
 
 /**
  * Draws the agent's querySales calls in the chat. The tool runs in the agent; this component only
@@ -19,7 +20,7 @@ import { type SalesView, salesViewSchema } from '../data/sales-view';
         @if (view(); as view) {
           <app-sales-chart [title]="view.title" [kind]="view.chart" [result]="result" />
           <footer>
-            <button type="button" class="pin" [disabled]="pinned()" (click)="pin(view)">
+            <button type="button" class="pin" [disabled]="pinned()" (click)="dashboard.pin(view)">
               {{ pinned() ? 'Pinned to dashboard' : 'Pin to dashboard' }}
             </button>
           </footer>
@@ -38,40 +39,20 @@ import { type SalesView, salesViewSchema } from '../data/sales-view';
 export class SalesViewRenderer implements ToolRenderer<SalesView> {
   readonly toolCall = input.required<AngularToolCall<SalesView>>();
 
-  private readonly dashboard = inject(DashboardStore);
+  protected readonly dashboard = inject(DashboardStore);
 
   protected readonly view = computed(() => salesViewSchema.safeParse(this.toolCall().args).data);
 
-  private readonly output = computed(() => {
-    const call = this.toolCall();
-    if (call.status !== 'complete') return undefined;
-    try {
-      const output: unknown = JSON.parse(call.result);
-      if (typeof output === 'object' && output !== null) return output as AggregateResponse | { error: string };
-    } catch {
-      // Not JSON: handled below.
-    }
-    return { error: 'The agent returned no readable result.' };
-  });
-
-  protected readonly result = computed(() => {
-    const output = this.output();
-    return output && 'rows' in output ? output : undefined;
-  });
-
-  protected readonly error = computed(() => {
-    const output = this.output();
-    return output && 'error' in output ? output.error : undefined;
-  });
+  private readonly output = computed(() =>
+    readToolResult<AggregateResponse, SalesView>(this.toolCall(), (output) => 'rows' in output),
+  );
+  protected readonly result = computed(() => this.output()?.value);
+  protected readonly error = computed(() => this.output()?.error);
 
   protected readonly pinned = computed(() => {
     const view = this.view();
     return view ? this.dashboard.isPinned(view) : false;
   });
-
-  protected pin(view: SalesView): void {
-    this.dashboard.pin(view);
-  }
 }
 
 export const salesViewRenderer: RenderToolCallConfig<SalesView> = {

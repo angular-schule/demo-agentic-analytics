@@ -1,12 +1,21 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiExtraModels, ApiOkResponse, ApiProperty, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { EnvironmentVariables } from '../env.config';
-import { AggregateRequestDto } from './aggregate-request.dto';
-import { AggregateResponse, SalesAggregatorService } from './sales-aggregator.service';
-import { SchemaService } from './schema.service';
+import { ProblemDetails } from '../problem-details.filter';
+import { AggregateRequest, AggregateResponse } from './aggregate-contract';
+import { SalesAggregatorService } from './sales-aggregator.service';
+import { SchemaResponse, SchemaService } from './schema.service';
+
+export class HealthResponse {
+  @ApiProperty({ type: String }) status!: string;
+  @ApiProperty({ type: String }) backend!: string;
+  @ApiProperty({ type: String }) database!: string;
+  @ApiProperty({ type: String }) scope!: string;
+}
 
 @ApiTags('analytics')
+@ApiExtraModels(ProblemDetails)
 @Controller('api')
 export class AnalyticsController {
   constructor(
@@ -16,18 +25,22 @@ export class AnalyticsController {
   ) {}
 
   @Get('health')
-  health() {
+  @ApiOkResponse({ type: HealthResponse })
+  health(): HealthResponse {
     return { status: 'ok', backend: 'node', database: 'PostgreSQL', scope: this.config.get('DATA_SCOPE', { infer: true }) };
   }
 
   @Get('schema')
-  getSchema() {
+  @ApiOkResponse({ type: SchemaResponse })
+  getSchema(): Promise<SchemaResponse> {
     return this.schema.get();
   }
 
   @Post('sales/aggregate')
   @HttpCode(200)
-  aggregate(@Body() request: AggregateRequestDto): Promise<AggregateResponse> {
+  @ApiOkResponse({ type: AggregateResponse })
+  @ApiBadRequestResponse({ content: { 'application/problem+json': { schema: { $ref: getSchemaPath(ProblemDetails) } } } })
+  aggregate(@Body() request: AggregateRequest): Promise<AggregateResponse> {
     return this.aggregator.aggregate(request);
   }
 }

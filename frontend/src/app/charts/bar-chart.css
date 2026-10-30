@@ -28,9 +28,22 @@
 
 .track {
   position: relative;
+  padding-block: 1px;
+}
+
+/* Room for the value at the tip of a bar: right of positive bars, left of negative ones. */
+.track.tips {
+  padding-right: 4rem;
+}
+
+.track.tips.negatives {
+  padding-left: 4rem;
+}
+
+.plot {
+  position: relative;
   display: grid;
   gap: 2px;
-  padding-block: 1px;
 }
 
 .baseline {
@@ -79,24 +92,8 @@
   position: absolute;
   z-index: 2;
   top: 100%;
-  left: 34%;
-  display: grid;
-  gap: 0.15rem;
+  left: 0;
   min-width: 12rem;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-md);
-  font-size: 0.8125rem;
-  pointer-events: none;
-}
-
-.tooltip-line {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .key {

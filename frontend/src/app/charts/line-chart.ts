@@ -25,15 +25,15 @@ const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
         <line class="baseline" [attr.x1]="margin.left" [attr.x2]="width() - margin.right" [attr.y1]="plot.zeroY" [attr.y2]="plot.zeroY" />
       }
       @for (line of plot.lines; track line.slot) {
-        <path class="line" [attr.d]="line.path" [style.stroke]="'var(--series-' + line.slot + ')'" />
+        <path class="line" [attr.d]="line.path" [style.stroke]="line.color" />
         @if (line.end) {
-          <circle class="marker" [attr.cx]="line.end.x" [attr.cy]="line.end.y" r="4" [style.fill]="'var(--series-' + line.slot + ')'" />
+          <circle class="marker" [attr.cx]="line.end.x" [attr.cy]="line.end.y" r="4" [style.fill]="line.color" />
         }
       }
       @if (hoveredPoint(); as point) {
         <line class="crosshair" [attr.x1]="point.x" [attr.x2]="point.x" [attr.y1]="margin.top" [attr.y2]="height - margin.bottom" />
         @for (dot of point.dots; track dot.slot) {
-          <circle class="marker" [attr.cx]="point.x" [attr.cy]="dot.y" r="4" [style.fill]="'var(--series-' + dot.slot + ')'" />
+          <circle class="marker" [attr.cx]="point.x" [attr.cy]="dot.y" r="4" [style.fill]="dot.color" />
         }
       }
     </svg>
@@ -42,7 +42,7 @@ const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
         <strong>{{ point.category }}</strong>
         @for (dot of point.dots; track dot.slot) {
           <span class="tooltip-line">
-            <i class="key" [style.background]="'var(--series-' + dot.slot + ')'"></i>
+            <i class="key" [style.background]="dot.color"></i>
             @if (chart().series.length > 1) {
               {{ dot.label }}:
             }
@@ -52,7 +52,7 @@ const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
       </div>
     }
   `,
-  styleUrl: './line-chart.css',
+  styleUrls: ['./tooltip.css', './line-chart.css'],
 })
 export class LineChart {
   readonly chart = input.required<CategoryChart>();
@@ -105,7 +105,7 @@ export class LineChart {
           }
           previous = value;
         }
-        return { slot: series.slot, path, end };
+        return { slot: series.slot, color: series.color, path, end };
       }),
     };
   });
@@ -122,7 +122,7 @@ export class LineChart {
         const value = series.values[index];
         return value === null || value === undefined
           ? []
-          : [{ slot: series.slot, label: series.label, y: y(value), text: formatValue(value, chart.measure.unit) }];
+          : [{ slot: series.slot, color: series.color, label: series.label, y: y(value), text: formatValue(value, chart.measure.unit) }];
       }),
     };
   });

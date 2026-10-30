@@ -1,4 +1,4 @@
-import { effect, Injectable, signal } from '@angular/core';
+import { computed, effect, Injectable, signal } from '@angular/core';
 import { z } from 'zod';
 import { type SalesView, salesViewSchema } from '../data/sales-view';
 
@@ -15,6 +15,7 @@ export type DashboardTile = z.infer<typeof tileSchema>;
 export class DashboardStore {
   private readonly tilesState = signal<DashboardTile[]>(load());
   readonly tiles = this.tilesState.asReadonly();
+  private readonly pinnedKeys = computed(() => new Set(this.tiles().map(viewKey)));
 
   constructor() {
     effect(() => {
@@ -26,18 +27,15 @@ export class DashboardStore {
     });
   }
 
-  /** Pins a view. Views come from the model, so they are checked against the schema first. */
-  pin(view: unknown): DashboardTile | null {
-    const parsed = salesViewSchema.safeParse(view);
-    if (!parsed.success) return null;
-    const tile = { ...parsed.data, id: crypto.randomUUID() };
-    this.tilesState.update((tiles) => [...tiles, tile]);
-    return tile;
+  /** Pins a parsed view, unless the same view is already on the dashboard. */
+  pin(view: SalesView): boolean {
+    if (this.isPinned(view)) return false;
+    this.tilesState.update((tiles) => [...tiles, { ...view, id: crypto.randomUUID() }]);
+    return true;
   }
 
   isPinned(view: SalesView): boolean {
-    const key = viewKey(view);
-    return this.tiles().some((tile) => viewKey(tile) === key);
+    return this.pinnedKeys().has(viewKey(view));
   }
 
   remove(id: string): void {

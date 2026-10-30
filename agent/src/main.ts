@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { EventType, type BaseEvent, type RunAgentInput } from '@ag-ui/client';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { EventType, type BaseEvent } from '@ag-ui/client';
+import { RunAgentInputSchema } from '@ag-ui/core/schemas';
 import { MastraAgent } from '@ag-ui/mastra';
 import { Agent } from '@mastra/core/agent';
 import { ALLOWED_ORIGIN, DATA_API_URL, HOST, MODEL, PORT } from './config.ts';
@@ -7,7 +9,7 @@ import { dataApi, type SalesSchema } from './data-api.ts';
 import { createInstructions } from './instructions.ts';
 import { createTools } from './tools.ts';
 
-export const AGENT_ID = 'analyst';
+const AGENT_ID = 'analyst';
 const MAX_BODY_BYTES = 1_000_000;
 const TOO_LARGE = Symbol('too large');
 
@@ -29,10 +31,11 @@ async function runAgent(request: IncomingMessage, response: ServerResponse): Pro
   if (body === TOO_LARGE) {
     return sendJson(response, 413, { error: `The conversation exceeds ${MAX_BODY_BYTES} bytes. Start a new chat.` });
   }
-  const input = body as RunAgentInput;
-  if (!input?.threadId || !input.runId || !Array.isArray(input.messages)) {
-    return sendJson(response, 400, { error: 'Expected an AG-UI RunAgentInput.' });
+  const parsed = RunAgentInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return sendJson(response, 400, { error: `Expected an AG-UI RunAgentInput: ${parsed.error.message}` });
   }
+  const input = parsed.data;
 
   const agent = new MastraAgent({
     agentId: AGENT_ID,
@@ -77,7 +80,7 @@ const server = createServer((request, response) => {
   if (request.method === 'OPTIONS') {
     response.writeHead(204).end();
   } else if (request.method === 'GET' && path === '/agent/info') {
-    sendJson(response, 200, { agentId: AGENT_ID, model: MODEL, scope: schema.dataset.scope });
+    sendJson(response, 200, { model: MODEL });
   } else if (request.method === 'POST' && path === `/agent/ag-ui/${AGENT_ID}`) {
     runAgent(request, response).catch((error: unknown) => {
       console.error(error);
@@ -100,7 +103,7 @@ async function loadSchema(): Promise<SalesSchema> {
     } catch (error) {
       if (attempt === 60) throw error;
       console.log(`Waiting for the data backend at ${DATA_API_URL} …`);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await sleep(5000);
     }
   }
 }

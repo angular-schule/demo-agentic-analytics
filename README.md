@@ -15,7 +15,7 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 - **A Mastra agent** whose tools are generated from the semantic layer of the data backend, so the model only knows names that really exist.
 - **A semantic layer instead of SQL.** The model chooses measures, dimensions and filters. It never writes SQL; the backends validate every request and pass values as parameters.
 - **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
-- **Two interchangeable data backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Contract tests make sure both give identical answers.
+- **Two interchangeable data backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
 - **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the data backend directly.
 
 ## Architecture
@@ -52,7 +52,7 @@ docker compose --profile node up --build     # NestJS + PostgreSQL
 docker compose --profile dotnet up --build   # ASP.NET Core + SQL Server
 ```
 
-Then open <http://localhost:8080>.
+Then open <http://localhost:8080>. The data backend's Swagger UI opens at <http://localhost:8081> (.NET) or <http://localhost:8082> (Node).
 The first start imports the AdventureWorks data and takes a few minutes.
 SQL Server is published for amd64 only; on Apple Silicon it runs emulated and needs about 2 GB of memory for the Docker VM.
 
@@ -86,7 +86,7 @@ cd agent && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start
 cd frontend && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start   # http://localhost:4200
 ```
 
-With both backends running (.NET on 8081, Node on 8082), the contract tests compare them:
+With both backends running (.NET on 8081, Node on 8082), the contract tests compare their OpenAPI documents and their answers:
 
 ```bash
 node --test 'contract/*.test.mjs'

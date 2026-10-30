@@ -37,9 +37,9 @@ export function registerDashboardTool(): void {
     handler: async (view) => {
       const parsed = salesViewSchema.safeParse(view);
       if (!parsed.success) return `Not pinned, the view is invalid: ${parsed.error.message}`;
-      if (dashboard.isPinned(parsed.data)) return 'This view is already on the dashboard.';
-      dashboard.pin(parsed.data);
-      return `Pinned "${parsed.data.title}" to the dashboard.`;
+      return dashboard.pin(parsed.data)
+        ? `Pinned "${parsed.data.title}" to the dashboard.`
+        : 'This view is already on the dashboard.';
     },
   });
 }

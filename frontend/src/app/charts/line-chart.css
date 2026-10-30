@@ -43,29 +43,13 @@ svg {
   position: absolute;
   z-index: 2;
   top: 0.5rem;
-  display: grid;
-  gap: 0.15rem;
   min-width: 10rem;
   margin-left: 0.75rem;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
-  box-shadow: var(--shadow-md);
-  font-size: 0.8125rem;
-  pointer-events: none;
 }
 
 .tooltip.flip {
   margin-left: -0.75rem;
   transform: translateX(-100%);
-}
-
-.tooltip-line {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .key {

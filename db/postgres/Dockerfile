@@ -1,5 +1,6 @@
 # PostgreSQL 17 with AdventureWorksDW, loaded from Microsoft's official CSV files on first start.
-FROM postgres:17
+# The data is prepared in a separate stage, so the image holds one copy of the CSV files.
+FROM postgres:17 AS data
 
 # Pinned to one commit of microsoft/sql-server-samples (MIT licence) and verified by checksum.
 ADD \
@@ -25,4 +26,6 @@ RUN cd /aw-data \
  && for f in *.csv; do tr -d '\000' < "$f" > "$f.tmp" && mv "$f.tmp" "$f"; done \
  && chmod a+r /aw-data/*
 
+FROM postgres:17
+COPY --from=data /aw-data/ /aw-data/
 COPY initdb/ /docker-entrypoint-initdb.d/

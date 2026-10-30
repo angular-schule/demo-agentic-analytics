@@ -38,6 +38,7 @@ footer {
 .loading,
 .error {
   margin: 0;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -45,11 +46,6 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  color: var(--text-secondary);
-}
-
-.error {
-  color: var(--text-secondary);
 }
 
 .pulse {

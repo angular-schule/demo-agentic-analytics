@@ -2,7 +2,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { DataApiError, dataApi, type SalesSchema } from './data-api.ts';
 
-export const CHART_KINDS = ['bar', 'line', 'table', 'kpi'] as const;
+const CHART_KINDS = ['bar', 'line', 'table', 'kpi'] as const;
 
 /**
  * Builds the agent's tools from the semantic layer the data backend publishes. Dimension and
@@ -56,13 +56,7 @@ export function createTools(schema: SalesSchema) {
       chart: z.enum(CHART_KINDS),
       query: querySchema,
     }),
-    execute: async ({ query }) => {
-      try {
-        return await dataApi.aggregate(query);
-      } catch (error) {
-        return { error: describeError(error) };
-      }
-    },
+    execute: ({ query }) => orError(() => dataApi.aggregate(query)),
   });
 
   const findProducts = createTool({
@@ -76,13 +70,7 @@ export function createTools(schema: SalesSchema) {
       search: z.string().min(2).describe('Part of the product name, e.g. "Mountain-200" or "helmet".'),
       limit: z.number().int().min(1).max(24).optional().describe('Default 8.'),
     }),
-    execute: async ({ search, limit }) => {
-      try {
-        return { products: await dataApi.products(search, limit ?? 8) };
-      } catch (error) {
-        return { error: describeError(error) };
-      }
-    },
+    execute: ({ search, limit }) => orError(async () => ({ products: await dataApi.products(search, limit ?? 8) })),
   });
 
   return { querySales, findProducts };
@@ -92,9 +80,13 @@ export function createTools(schema: SalesSchema) {
  * Every failure becomes a tool result: the model can correct a rejected request or tell the user
  * that the data backend is unavailable, and the chat card shows the message instead of waiting.
  */
-function describeError(error: unknown): string {
-  if (error instanceof DataApiError) return error.message;
-  if (error instanceof DOMException && error.name === 'TimeoutError') return 'The data backend did not answer in time.';
-  console.error(error);
-  return 'The data backend is not reachable.';
+async function orError<T>(call: () => Promise<T>): Promise<T | { error: string }> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof DataApiError) return { error: error.message };
+    if (error instanceof DOMException && error.name === 'TimeoutError') return { error: 'The data backend did not answer in time.' };
+    console.error(error);
+    return { error: 'The data backend is not reachable.' };
+  }
 }

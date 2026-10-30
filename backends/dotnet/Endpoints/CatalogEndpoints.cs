@@ -1,5 +1,7 @@
 using AgenticAnalytics.Api.Data;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 
 namespace AgenticAnalytics.Api.Endpoints;
 
@@ -35,20 +37,31 @@ public static class CatalogEndpoints
                 .ToListAsync(ct);
         });
 
-        api.MapGet("/products/{productKey:int}", async (AnalyticsContext db, int productKey, CancellationToken ct) =>
+        api.MapGet("/products/{productKey:int}", async Task<Results<Ok<ProductDetail>, NotFound>> (AnalyticsContext db, int productKey, CancellationToken ct) =>
         {
             var product = await db.Products
                 .Where(p => p.ProductKey == productKey)
                 .Select(p => new ProductDetail(p.ProductKey, p.ProductName, p.ModelName, p.ProductSubcategory, p.ProductCategory, p.Color, p.ListPrice, p.Description, p.LargePhoto != null))
                 .FirstOrDefaultAsync(ct);
-            return product is null ? Results.NotFound() : Results.Ok(product);
+            return product is null ? TypedResults.NotFound() : TypedResults.Ok(product);
         });
 
-        api.MapGet("/products/{productKey:int}/photo", async (AnalyticsContext db, int productKey, CancellationToken ct) =>
+        api.MapGet("/products/{productKey:int}/photo", async (AnalyticsContext db, HttpResponse response, int productKey, CancellationToken ct) =>
         {
             var photo = await db.Products.Where(p => p.ProductKey == productKey).Select(p => p.LargePhoto).FirstOrDefaultAsync(ct);
-            return photo is null ? Results.NotFound() : Results.File(photo, "image/gif");
-        });
+            if (photo is null) return Results.NotFound();
+            // Product photos practically never change; browsers may reuse one for an hour.
+            response.Headers.CacheControl = "public, max-age=3600";
+            return Results.File(photo, "image/gif");
+        })
+            .Produces(StatusCodes.Status200OK)
+            .AddOpenApiOperationTransformer((operation, _, _) =>
+            {
+                var gif = new OpenApiMediaType { Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary" } };
+                operation.Responses?["200"].Content?.Add("image/gif", gif);
+                return Task.CompletedTask;
+            })
+            .Produces(StatusCodes.Status404NotFound);
 
         api.MapGet("/resellers", async (AnalyticsContext db, string? search, string? country, string? businessType, int? limit, CancellationToken ct) =>
         {

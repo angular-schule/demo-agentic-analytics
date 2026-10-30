@@ -1,6 +1,6 @@
 import { Component, input } from '@angular/core';
 import type { AggregateResponse, CellValue, ResultColumn } from '../data/sales-api';
-import { formatDimension, formatValue, humanize } from './chart-model';
+import { columnCaption, formatDimension, formatValue } from './chart-model';
 
 /** The result as a plain table: every chart can switch to it, so nothing depends on color alone. */
 @Component({
@@ -65,9 +65,7 @@ import { formatDimension, formatValue, humanize } from './chart-model';
 export class DataTable {
   readonly result = input.required<AggregateResponse>();
 
-  protected label(column: ResultColumn): string {
-    return humanize(column.name) + (column.unit ? ` (${column.unit})` : '');
-  }
+  protected readonly label = columnCaption;
 
   protected cell(column: ResultColumn, value: CellValue): string {
     return column.kind === 'measure' ? formatValue(value, column.unit) : formatDimension(column.name, value);

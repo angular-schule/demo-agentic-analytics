@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { AggregateRequest } from './sales-api';
 
 export const CHART_KINDS = ['bar', 'line', 'table', 'kpi'] as const;
 export type ChartKind = (typeof CHART_KINDS)[number];
@@ -25,7 +24,7 @@ export const salesViewSchema = z.object({
       .optional(),
     orderBy: z.object({ field: z.string(), direction: z.enum(['asc', 'desc']).optional() }).optional(),
     limit: z.number().optional(),
-  }) satisfies z.ZodType<AggregateRequest>,
+  }),
 });
 
 export type SalesView = z.infer<typeof salesViewSchema>;

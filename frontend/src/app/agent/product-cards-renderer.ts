@@ -1,8 +1,9 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import type { AngularToolCall, RenderToolCallConfig, ToolRenderer } from '@copilotkit/angular';
 import { z } from 'zod';
-import { type ProductSummary, SalesApi } from '../data/sales-api';
+import { photoUrl, type ProductSummary } from '../data/sales-api';
+import { readToolResult } from './tool-result';
 
 const findProductsSchema = z.object({ search: z.string(), limit: z.number().optional() });
 type FindProductsArgs = z.infer<typeof findProductsSchema>;
@@ -16,9 +17,7 @@ type FindProductsArgs = z.infer<typeof findProductsSchema>;
   imports: [CurrencyPipe],
   template: `
     @if (products(); as products) {
-      @if (products === 'error') {
-        <p class="empty">The product search failed.</p>
-      } @else if (products.length === 0) {
+      @if (products.length === 0) {
         <p class="empty">No products match “{{ toolCall().args.search }}”.</p>
       } @else {
         <ul class="cards">
@@ -38,6 +37,8 @@ type FindProductsArgs = z.infer<typeof findProductsSchema>;
           }
         </ul>
       }
+    } @else if (error(); as error) {
+      <p class="empty">The product search failed. {{ error }}</p>
     } @else {
       <p class="empty">Searching products for “{{ toolCall().args.search }}” …</p>
     }
@@ -47,25 +48,16 @@ type FindProductsArgs = z.infer<typeof findProductsSchema>;
 export class ProductCardsRenderer implements ToolRenderer<FindProductsArgs> {
   readonly toolCall = input.required<AngularToolCall<FindProductsArgs>>();
 
-  private readonly api = inject(SalesApi);
+  protected readonly photoUrl = photoUrl;
 
-  protected readonly products = computed(() => {
-    const call = this.toolCall();
-    if (call.status !== 'complete') return undefined;
-    try {
-      const output: unknown = JSON.parse(call.result);
-      if (typeof output === 'object' && output !== null && 'products' in output && Array.isArray(output.products)) {
-        return output.products as ProductSummary[];
-      }
-    } catch {
-      // Not JSON: handled below.
-    }
-    return 'error' as const;
-  });
-
-  protected photoUrl(productKey: number): string {
-    return this.api.photoUrl(productKey);
-  }
+  private readonly output = computed(() =>
+    readToolResult<{ products: ProductSummary[] }, FindProductsArgs>(
+      this.toolCall(),
+      (output) => 'products' in output && Array.isArray(output.products),
+    ),
+  );
+  protected readonly products = computed(() => this.output()?.value?.products);
+  protected readonly error = computed(() => this.output()?.error);
 }
 
 export const productCardsRenderer: RenderToolCallConfig<FindProductsArgs> = {

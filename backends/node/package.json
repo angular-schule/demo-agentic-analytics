@@ -10,8 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
@@ -24,11 +23,11 @@
     "drizzle-orm": "0.45.2",
     "postgres": "3.4.9",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "swagger-ui-dist": "5.34.0"
   },
   "devDependencies": {
     "@types/node": "24.13.2",
-    "typescript": "5.9.3",
-    "vitest": "4.1.9"
+    "typescript": "5.9.3"
   }
 }

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 using AgenticAnalytics.Api.Data;
 using Microsoft.EntityFrameworkCore;
@@ -16,14 +17,15 @@ public sealed class GroupKey
     public string? S2 { get; init; }
 }
 
+/// <summary>One result row: the group key and the requested measures in M0..M4, in request order.</summary>
 public sealed class GroupRow
 {
     public GroupKey Key { get; init; } = new();
-    public decimal Revenue { get; init; }
-    public decimal Cost { get; init; }
-    public decimal Margin { get; init; }
-    public int Quantity { get; init; }
-    public int Orders { get; init; }
+    public decimal M0 { get; init; }
+    public decimal M1 { get; init; }
+    public decimal M2 { get; init; }
+    public decimal M3 { get; init; }
+    public decimal M4 { get; init; }
 }
 
 /// <summary>
@@ -37,6 +39,27 @@ public sealed class SalesAggregator(AnalyticsContext db)
     public const int MaxFilters = 10;
     public const int DefaultLimit = 100;
     public const int MaxLimit = 1000;
+
+    private static readonly string MeasureNames = string.Join(", ", SalesModel.Measures.Select(m => m.Name));
+    private static readonly string DimensionNames = string.Join(", ", SalesModel.Dimensions.Select(d => d.Name));
+
+    /// <summary>A slot of <see cref="GroupRow"/>: where to bind it, how to sort by it, how to read it from a loaded row.</summary>
+    private sealed record Slot(PropertyInfo Property, LambdaExpression Member, Func<GroupRow, object?> Read);
+
+    private static readonly Dictionary<string, Slot> Slots = new[] { "I0", "I1", "I2", "S0", "S1", "S2", "M0", "M1", "M2", "M3", "M4" }
+        .ToDictionary(name => name, name =>
+        {
+            var owner = name.StartsWith('M') ? typeof(GroupRow) : typeof(GroupKey);
+            var property = owner.GetProperty(name) ?? throw new InvalidOperationException($"{owner.Name}.{name} is missing.");
+            var row = Expression.Parameter(typeof(GroupRow), "r");
+            var member = Expression.Property(owner == typeof(GroupRow) ? row : Expression.Property(row, nameof(GroupRow.Key)), property);
+            var read = Expression.Lambda<Func<GroupRow, object?>>(Expression.Convert(member, typeof(object)), row).Compile();
+            return new Slot(property, Expression.Lambda(member, row), read);
+        });
+
+    private static Slot DimensionSlot(DimensionDefinition dimension, int index) => Slots[(dimension.IsNumeric ? "I" : "S") + index];
+
+    private static Slot MeasureSlot(int index) => Slots["M" + index];
 
     public async Task<AggregateResponse> AggregateAsync(AggregateRequest request, CancellationToken cancellationToken)
     {
@@ -62,18 +85,7 @@ public sealed class SalesAggregator(AnalyticsContext db)
             ? filtered.GroupBy(_ => new GroupKey { I0 = 0 })
             : filtered.GroupBy(BuildKeySelector(dimensions));
 
-        var grouped = groups
-            .Select(g => new GroupRow
-            {
-                Key = g.Key,
-                Revenue = Math.Round(g.Sum(s => s.SalesAmount) ?? 0m, 2),
-                Cost = Math.Round(g.Sum(s => s.TotalProductCost) ?? 0m, 2),
-                Margin = Math.Round((g.Sum(s => s.SalesAmount) ?? 0m) - (g.Sum(s => s.TotalProductCost) ?? 0m), 2),
-                Quantity = g.Sum(s => (int?)s.OrderQuantity) ?? 0,
-                Orders = g.Select(s => s.SalesOrderNumber).Distinct().Count(),
-            });
-
-        var rows = await ApplyOrder(grouped, request.OrderBy, dimensions, measures)
+        var rows = await ApplyOrder(groups.Select(BuildRowSelector(measures)), request.OrderBy, dimensions, measures)
             .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
@@ -91,10 +103,10 @@ public sealed class SalesAggregator(AnalyticsContext db)
     {
         if (names is null || names.Count == 0)
         {
-            throw new InvalidQueryException($"Request at least one measure: {string.Join(", ", SalesModel.Measures.Select(m => m.Name))}.");
+            throw new InvalidQueryException($"Request at least one measure: {MeasureNames}.");
         }
         return names.Distinct().Select(name => SalesModel.FindMeasure(name)
-            ?? throw new InvalidQueryException($"Unknown measure '{name}'. Allowed: {string.Join(", ", SalesModel.Measures.Select(m => m.Name))}.")).ToList();
+            ?? throw new InvalidQueryException($"Unknown measure '{name}'. Allowed: {MeasureNames}.")).ToList();
     }
 
     private static List<DimensionDefinition> ResolveDimensions(IReadOnlyList<string>? names)
@@ -109,7 +121,7 @@ public sealed class SalesAggregator(AnalyticsContext db)
 
     private static DimensionDefinition FindDimensionOrThrow(string name) =>
         SalesModel.FindDimension(name)
-        ?? throw new InvalidQueryException($"Unknown dimension '{name}'. Allowed: {string.Join(", ", SalesModel.Dimensions.Select(d => d.Name))}.");
+        ?? throw new InvalidQueryException($"Unknown dimension '{name}'. Allowed: {DimensionNames}.");
 
     /// <summary>s => new GroupKey { I0 = s.OrderYear, S1 = s.SalesTerritoryCountry, ... }</summary>
     private static Expression<Func<Sale, GroupKey>> BuildKeySelector(IReadOnlyList<DimensionDefinition> dimensions)
@@ -118,11 +130,23 @@ public sealed class SalesAggregator(AnalyticsContext db)
         var bindings = dimensions.Select((dimension, index) =>
         {
             var value = Rebind(dimension.Selector, sale);
-            return dimension.IsNumeric
-                ? Expression.Bind(KeyProperty("I", index), Expression.Convert(value, typeof(int?)))
-                : Expression.Bind(KeyProperty("S", index), value);
+            return Expression.Bind(
+                DimensionSlot(dimension, index).Property,
+                dimension.IsNumeric ? Expression.Convert(value, typeof(int?)) : value);
         });
         return Expression.Lambda<Func<Sale, GroupKey>>(Expression.MemberInit(Expression.New(typeof(GroupKey)), bindings), sale);
+    }
+
+    /// <summary>g => new GroupRow { Key = g.Key, M0 = &lt;first measure&gt;, ... }: only the requested measures are computed.</summary>
+    private static Expression<Func<IGrouping<GroupKey, Sale>, GroupRow>> BuildRowSelector(IReadOnlyList<MeasureDefinition> measures)
+    {
+        var group = Expression.Parameter(typeof(IGrouping<GroupKey, Sale>), "g");
+        var key = Expression.Bind(
+            typeof(GroupRow).GetProperty(nameof(GroupRow.Key)) ?? throw new InvalidOperationException("GroupRow.Key is missing."),
+            Expression.Property(group, nameof(IGrouping<GroupKey, Sale>.Key)));
+        var values = measures.Select((measure, index) => Expression.Bind(MeasureSlot(index).Property, Rebind(measure.Aggregate, group)));
+        return Expression.Lambda<Func<IGrouping<GroupKey, Sale>, GroupRow>>(
+            Expression.MemberInit(Expression.New(typeof(GroupRow)), values.Prepend(key)), group);
     }
 
     private static Expression<Func<Sale, bool>> BuildFilter(FilterRequest filter)
@@ -161,8 +185,7 @@ public sealed class SalesAggregator(AnalyticsContext db)
         IReadOnlyList<DimensionDefinition> dimensions,
         IReadOnlyList<MeasureDefinition> measures)
     {
-        IOrderedQueryable<GroupRow>? ordered = null;
-
+        var keys = new List<(Slot Slot, bool Descending)>();
         if (orderBy is not null)
         {
             var descending = orderBy.Direction switch
@@ -171,67 +194,37 @@ public sealed class SalesAggregator(AnalyticsContext db)
                 "desc" => true,
                 _ => throw new InvalidQueryException("orderBy.direction must be 'asc' or 'desc'."),
             };
-            var index = dimensions.ToList().FindIndex(d => d.Name == orderBy.Field);
-            if (index >= 0)
-            {
-                ordered = OrderByDimension(rows, ordered, dimensions[index], index, descending);
-            }
-            else if (measures.Any(m => m.Name == orderBy.Field))
-            {
-                ordered = OrderByMeasure(rows, ordered, orderBy.Field, descending);
-            }
-            else
-            {
-                throw new InvalidQueryException($"orderBy.field '{orderBy.Field}' must be one of the requested dimensions or measures.");
-            }
+            var dimension = dimensions.Select((d, i) => (Definition: d, Index: i)).FirstOrDefault(x => x.Definition.Name == orderBy.Field);
+            var measure = measures.Select((m, i) => (Definition: m, Index: i)).FirstOrDefault(x => x.Definition.Name == orderBy.Field);
+            var slot = dimension.Definition is not null ? DimensionSlot(dimension.Definition, dimension.Index)
+                : measure.Definition is not null ? MeasureSlot(measure.Index)
+                : throw new InvalidQueryException($"orderBy.field '{orderBy.Field}' must be one of the requested dimensions or measures.");
+            keys.Add((slot, descending));
         }
-        else if (!dimensions.Any(d => d.IsNumeric))
+        else if (!dimensions.Any(d => d.IsTime))
         {
             // Without a time dimension the largest groups come first; time series stay chronological.
-            ordered = OrderByMeasure(rows, ordered, measures[0].Name, descending: true);
+            keys.Add((MeasureSlot(0), true));
         }
 
         // Ties are broken by the grouping columns, so every backend returns the same order.
-        for (var i = 0; i < dimensions.Count; i++)
+        keys.AddRange(dimensions.Select((d, i) => (DimensionSlot(d, i), false)));
+
+        for (var i = 0; i < keys.Count; i++)
         {
-            ordered = OrderByDimension(rows, ordered, dimensions[i], i, descending: false);
+            var method = (i == 0, keys[i].Descending) switch
+            {
+                (true, false) => nameof(Queryable.OrderBy),
+                (true, true) => nameof(Queryable.OrderByDescending),
+                (false, false) => nameof(Queryable.ThenBy),
+                (false, true) => nameof(Queryable.ThenByDescending),
+            };
+            var key = keys[i].Slot.Member;
+            rows = rows.Provider.CreateQuery<GroupRow>(Expression.Call(
+                typeof(Queryable), method, [typeof(GroupRow), key.ReturnType], rows.Expression, Expression.Quote(key)));
         }
-
-        return ordered ?? rows;
+        return rows;
     }
-
-    private static IOrderedQueryable<GroupRow> OrderByMeasure(
-        IQueryable<GroupRow> rows, IOrderedQueryable<GroupRow>? ordered, string measure, bool descending) => measure switch
-        {
-            "revenue" => Order(rows, ordered, r => r.Revenue, descending),
-            "cost" => Order(rows, ordered, r => r.Cost, descending),
-            "margin" => Order(rows, ordered, r => r.Margin, descending),
-            "quantity" => Order(rows, ordered, r => r.Quantity, descending),
-            "orders" => Order(rows, ordered, r => r.Orders, descending),
-            _ => throw new InvalidQueryException($"Unknown measure '{measure}'."),
-        };
-
-    private static IOrderedQueryable<GroupRow> OrderByDimension(
-        IQueryable<GroupRow> rows, IOrderedQueryable<GroupRow>? ordered, DimensionDefinition dimension, int index, bool descending) =>
-        (dimension.IsNumeric, index) switch
-        {
-            (true, 0) => Order(rows, ordered, r => r.Key.I0, descending),
-            (true, 1) => Order(rows, ordered, r => r.Key.I1, descending),
-            (true, _) => Order(rows, ordered, r => r.Key.I2, descending),
-            (false, 0) => Order(rows, ordered, r => r.Key.S0, descending),
-            (false, 1) => Order(rows, ordered, r => r.Key.S1, descending),
-            (false, _) => Order(rows, ordered, r => r.Key.S2, descending),
-        };
-
-    private static IOrderedQueryable<GroupRow> Order<T>(
-        IQueryable<GroupRow> rows, IOrderedQueryable<GroupRow>? ordered, Expression<Func<GroupRow, T>> key, bool descending) =>
-        (ordered, descending) switch
-        {
-            (null, false) => rows.OrderBy(key),
-            (null, true) => rows.OrderByDescending(key),
-            (_, false) => ordered.ThenBy(key),
-            (_, true) => ordered.ThenByDescending(key),
-        };
 
     private static Dictionary<string, object?> ToDictionary(
         GroupRow row, IReadOnlyList<DimensionDefinition> dimensions, IReadOnlyList<MeasureDefinition> measures)
@@ -239,33 +232,15 @@ public sealed class SalesAggregator(AnalyticsContext db)
         var result = new Dictionary<string, object?>();
         for (var i = 0; i < dimensions.Count; i++)
         {
-            result[dimensions[i].Name] = (dimensions[i].IsNumeric, i) switch
-            {
-                (true, 0) => row.Key.I0,
-                (true, 1) => row.Key.I1,
-                (true, _) => row.Key.I2,
-                (false, 0) => row.Key.S0,
-                (false, 1) => row.Key.S1,
-                (false, _) => row.Key.S2,
-            };
+            result[dimensions[i].Name] = DimensionSlot(dimensions[i], i).Read(row);
         }
-        foreach (var measure in measures)
+        for (var i = 0; i < measures.Count; i++)
         {
             // decimal.Round also drops the four-digit scale of SQL Server's money type: 12.50 instead of 12.5000.
-            result[measure.Name] = measure.Name switch
-            {
-                "revenue" => decimal.Round(row.Revenue, 2),
-                "cost" => decimal.Round(row.Cost, 2),
-                "margin" => decimal.Round(row.Margin, 2),
-                "quantity" => row.Quantity,
-                _ => row.Orders,
-            };
+            result[measures[i].Name] = MeasureSlot(i).Read(row) is decimal value ? decimal.Round(value, 2) : null;
         }
         return result;
     }
-
-    private static System.Reflection.PropertyInfo KeyProperty(string prefix, int index) =>
-        typeof(GroupKey).GetProperty(prefix + index) ?? throw new InvalidOperationException($"GroupKey.{prefix}{index} is missing.");
 
     private static Expression Rebind(LambdaExpression selector, ParameterExpression parameter) =>
         new ReplaceParameter(selector.Parameters[0], parameter).Visit(selector.Body);

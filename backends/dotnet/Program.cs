@@ -1,8 +1,11 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AgenticAnalytics.Api.Data;
 using AgenticAnalytics.Api.Endpoints;
 using AgenticAnalytics.Api.Semantic;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,10 +19,40 @@ builder.Services.AddDbContext<AnalyticsContext>(options => options
     .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
     .AddInterceptors(new DataScopeInterceptor(scope.TerritoryGroup)));
 builder.Services.AddScoped<SalesAggregator>();
-builder.Services.AddScoped<SchemaService>();
+builder.Services.AddSingleton<SchemaService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<InvalidQueryHandler>();
-builder.Services.AddOpenApi();
+// Numbers are numbers: no "12" for 12, so the OpenAPI document says integer, not integer or string.
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info = new OpenApiInfo { Title = "Agentic Analytics data API", Version = "v1" };
+        // Relative to wherever the document is served from, like the Node backend's document.
+        document.Servers = [];
+        return Task.CompletedTask;
+    });
+    // What the records cannot say by their types: a filter value is a string or a whole number,
+    // operator and direction take fixed words. The aggregator checks all of it again.
+    options.AddSchemaTransformer((schema, context, _) =>
+    {
+        var property = (context.JsonPropertyInfo?.DeclaringType, context.JsonPropertyInfo?.Name);
+        if (property == (typeof(FilterRequest), "values"))
+        {
+            schema.Items = new OpenApiSchema { OneOf = [new OpenApiSchema { Type = JsonSchemaType.String }, new OpenApiSchema { Type = JsonSchemaType.Integer }] };
+        }
+        else if (property == (typeof(FilterRequest), "operator"))
+        {
+            schema.Enum = ["eq", "in", "gte", "lte"];
+        }
+        else if (property == (typeof(OrderByRequest), "direction"))
+        {
+            schema.Enum = ["asc", "desc"];
+        }
+        return Task.CompletedTask;
+    });
+});
 
 var app = builder.Build();
 
@@ -36,14 +69,23 @@ app.Use((context, next) =>
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.MapOpenApi();
+app.UseSwaggerUI(options =>
+{
+    options.DocumentTitle = "Agentic Analytics data API";
+    options.SwaggerEndpoint("/openapi/v1.json", "Agentic Analytics data API");
+});
+app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
-var api = app.MapGroup("/api");
-api.MapGet("/health", (DataScope s) => new { status = "ok", backend = "dotnet", database = "SQL Server", scope = s.TerritoryGroup });
-api.MapGet("/schema", (SchemaService schema, CancellationToken ct) => schema.GetAsync(ct));
-api.MapPost("/sales/aggregate", (SalesAggregator aggregator, AggregateRequest request, CancellationToken ct) => aggregator.AggregateAsync(request, ct));
-api.MapCatalogEndpoints();
+var analytics = app.MapGroup("/api").WithTags("analytics");
+analytics.MapGet("/health", (DataScope s) => new HealthResponse("ok", "dotnet", "SQL Server", s.TerritoryGroup));
+analytics.MapGet("/schema", (SchemaService schema) => schema.GetAsync());
+analytics.MapPost("/sales/aggregate", (SalesAggregator aggregator, AggregateRequest request, CancellationToken ct) => aggregator.AggregateAsync(request, ct))
+    .ProducesProblem(StatusCodes.Status400BadRequest);
+app.MapGroup("/api").WithTags("catalog").MapCatalogEndpoints();
 
 app.Run();
+
+internal sealed record HealthResponse(string Status, string Backend, string Database, string Scope);
 
 /// <summary>Answers requests outside the semantic layer with 400 and a message naming the allowed values.</summary>
 internal sealed class InvalidQueryHandler(IProblemDetailsService problemDetails) : IExceptionHandler

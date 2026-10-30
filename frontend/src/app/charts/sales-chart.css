@@ -12,6 +12,7 @@ header {
 }
 
 h3 {
+  flex: 1;
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -74,5 +75,5 @@ h3 {
 .note {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }

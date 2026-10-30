@@ -1,5 +1,5 @@
 // Contract tests: the same requests against both data backends must give the same answers.
-// Run with both backends up:  node --test contract/
+// Run with both backends up:  node --test 'contract/*.test.mjs'
 // DOTNET_API_URL and NODE_API_URL default to the ports from compose.yaml.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';

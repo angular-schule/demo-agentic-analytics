@@ -1,4 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@nestjs/common';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 import { InvalidQueryError } from './semantic/sales-model';
 
@@ -7,6 +8,15 @@ const TYPES: Record<number, string> = {
   404: 'https://tools.ietf.org/html/rfc9110#section-15.5.5',
   500: 'https://tools.ietf.org/html/rfc9110#section-15.6.1',
 };
+
+/** RFC 9457 problem details. */
+export class ProblemDetails {
+  @ApiPropertyOptional({ type: String, nullable: true }) type?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) title?: string | null;
+  @ApiPropertyOptional({ type: 'integer', format: 'int32', nullable: true }) status?: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) detail?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) instance?: string | null;
+}
 
 /**
  * Answers every error as RFC 9457 problem details, the same format the ASP.NET Core backend uses.

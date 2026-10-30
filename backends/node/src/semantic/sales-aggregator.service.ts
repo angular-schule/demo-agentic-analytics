@@ -1,40 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { and, countDistinct, eq, gte, inArray, lte, SQL, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, SQL, sql } from 'drizzle-orm';
 import { PgColumn } from 'drizzle-orm/pg-core';
 import { sales } from '../db/analytics.schema';
 import { DrizzleService } from '../db/drizzle.service';
-import { AggregateRequestDto, FilterDto, OrderByDto } from './aggregate-request.dto';
+import { AggregateRequest, AggregateResponse, ColumnDescription, FilterRequest, OrderByRequest } from './aggregate-contract';
 import {
   DimensionDefinition,
   findDimension,
-  findMeasure,
+  findMeasures,
   InvalidQueryError,
   LIMITS,
   MeasureDefinition,
-  MeasureName,
 } from './sales-model';
-
-export interface ColumnDescription {
-  name: string;
-  kind: 'dimension' | 'measure';
-  unit: string | null;
-}
-
-export interface AggregateResponse {
-  columns: ColumnDescription[];
-  rows: Record<string, string | number | null>[];
-  rowCount: number;
-  truncated: boolean;
-}
-
-/** SQL for each measure. Columns are interpolated by Drizzle, nothing is concatenated as text. */
-const MEASURE_SQL: Record<MeasureName, SQL<number>> = {
-  revenue: sql<number>`round(coalesce(sum(${sales.salesAmount}), 0), 2)`.mapWith(Number),
-  cost: sql<number>`round(coalesce(sum(${sales.totalProductCost}), 0), 2)`.mapWith(Number),
-  margin: sql<number>`round(coalesce(sum(${sales.salesAmount}), 0) - coalesce(sum(${sales.totalProductCost}), 0), 2)`.mapWith(Number),
-  quantity: sql<number>`coalesce(sum(${sales.orderQuantity}), 0)`.mapWith(Number),
-  orders: countDistinct(sales.salesOrderNumber),
-};
 
 /**
  * Turns an aggregate request into one Drizzle query over analytics.sales. Every column comes from
@@ -44,8 +21,8 @@ const MEASURE_SQL: Record<MeasureName, SQL<number>> = {
 export class SalesAggregatorService {
   constructor(private readonly drizzle: DrizzleService) {}
 
-  async aggregate(request: AggregateRequestDto): Promise<AggregateResponse> {
-    const measures = [...new Set(request.measures)].map(findMeasure);
+  async aggregate(request: AggregateRequest): Promise<AggregateResponse> {
+    const measures = findMeasures(request.measures ?? []);
     const groupBy = [...new Set(request.groupBy ?? [])];
     if (groupBy.length > LIMITS.maxGroupBy) {
       throw new InvalidQueryError(`Group by at most ${LIMITS.maxGroupBy} dimensions.`);
@@ -62,7 +39,7 @@ export class SalesAggregatorService {
       selection[dimension.name] = dimension.column;
     }
     for (const measure of measures) {
-      selection[measure.name] = MEASURE_SQL[measure.name];
+      selection[measure.name] = measure.sql;
     }
 
     let query = this.drizzle.db
@@ -88,7 +65,7 @@ export class SalesAggregatorService {
   }
 }
 
-function buildFilter(filter: FilterDto): SQL {
+function buildFilter(filter: FilterRequest): SQL {
   const dimension = findDimension(filter.dimension);
   const read = (value: unknown) => readValue(dimension, value);
   const single = filter.values.length === 1 ? filter.values[0] : undefined;
@@ -125,7 +102,7 @@ function readValue(dimension: DimensionDefinition, value: unknown): string | num
  * NULLs sort first ascending and last descending, as in SQL Server, so both backends return rows in
  * the same order. Ties are broken by the grouping columns.
  */
-function buildOrder(orderBy: OrderByDto | undefined, dimensions: DimensionDefinition[], measures: MeasureDefinition[]): SQL[] {
+function buildOrder(orderBy: OrderByRequest | null | undefined, dimensions: DimensionDefinition[], measures: MeasureDefinition[]): SQL[] {
   const direction = (expression: PgColumn | SQL, descending: boolean) =>
     descending ? sql`${expression} desc nulls last` : sql`${expression} asc nulls first`;
   const order: SQL[] = [];
@@ -137,13 +114,13 @@ function buildOrder(orderBy: OrderByDto | undefined, dimensions: DimensionDefini
     if (dimension) {
       order.push(direction(dimension.column, descending));
     } else if (measure) {
-      order.push(direction(MEASURE_SQL[measure.name], descending));
+      order.push(direction(measure.sql, descending));
     } else {
       throw new InvalidQueryError(`orderBy.field '${orderBy.field}' must be one of the requested dimensions or measures.`);
     }
-  } else if (!dimensions.some((d) => d.isNumeric) && measures[0]) {
+  } else if (!dimensions.some((d) => d.isTime) && measures[0]) {
     // Without a time dimension the largest groups come first; time series stay chronological.
-    order.push(direction(MEASURE_SQL[measures[0].name], true));
+    order.push(direction(measures[0].sql, true));
   }
 
   for (const dimension of dimensions) {

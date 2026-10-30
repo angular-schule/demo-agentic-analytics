@@ -1,14 +1,17 @@
-import type { AggregateResponse, CellValue, ResultColumn } from '../data/sales-api';
+import type { AggregateResponse, CellValue, ResultColumn, ResultRow } from '../data/sales-api';
+import type { ChartKind } from '../data/sales-view';
 
 /** Categorical slots in fixed order; a series keeps its slot, never a cycled hue. */
-export const MAX_SERIES = 8;
+const MAX_SERIES = 8;
 const TIME_DIMENSIONS = ['year', 'quarter', 'month'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export interface Series {
   label: string;
-  /** 1-based categorical slot, see --series-n in styles.css. */
+  /** 1-based categorical slot. */
   slot: number;
+  /** The slot's colour, --series-n in styles.css. */
+  color: string;
   values: (number | null)[];
 }
 
@@ -24,9 +27,28 @@ export interface CategoryChart {
   max: number;
 }
 
+/** The form a result is shown in. */
+export type ChartView = { kind: 'table' } | { kind: 'kpi' } | { kind: 'bar' | 'line'; chart: CategoryChart };
+
+/**
+ * The requested form if the result fits it, otherwise the table: a stat tile needs exactly one
+ * row, a chart at least one row and a measure.
+ */
+export function resolveView(result: AggregateResponse, kind: ChartKind): ChartView {
+  if (kind === 'kpi') return result.rows.length === 1 ? { kind } : { kind: 'table' };
+  if (kind === 'table' || result.rows.length === 0) return { kind: 'table' };
+  const chart = toCategoryChart(result, kind);
+  return chart ? { kind, chart } : { kind: 'table' };
+}
+
 export function humanize(name: string): string {
   const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Column header or axis caption: "List price (USD)". */
+export function columnCaption(column: ResultColumn): string {
+  return humanize(column.name) + (column.unit ? ` (${column.unit})` : '');
 }
 
 export function formatDimension(name: string, value: CellValue): string {
@@ -80,10 +102,9 @@ export function toCategoryChart(result: AggregateResponse, kind: 'bar' | 'line')
     kind === 'line' && timeDimensions.length > 0 ? timeDimensions : dimensions.slice(0, 1);
   const seriesDimensions = dimensions.filter((d) => !xDimensions.includes(d));
   const plotted = seriesDimensions.length > 0 ? [measure] : measures.filter((m) => m.unit === measure.unit);
-  const unit = measure.unit ? ` (${measure.unit})` : '';
-  const caption = plotted.length > 1 ? `Values${unit}` : `${humanize(measure.name)}${unit}`;
+  const caption = columnCaption(plotted.length > 1 ? { ...measure, name: 'values' } : measure);
 
-  const label = (row: AggregateResponse['rows'][number], columns: ResultColumn[]) =>
+  const label = (row: ResultRow, columns: ResultColumn[]) =>
     columns.map((c) => formatDimension(c.name, row[c.name] ?? null)).join(' ');
 
   let rows = result.rows;
@@ -91,16 +112,12 @@ export function toCategoryChart(result: AggregateResponse, kind: 'bar' | 'line')
     rows = [...rows].sort((a, b) => compareRows(a, b, xDimensions));
   }
 
-  const categories: string[] = [];
-  const seen = new Set<string>();
+  const categories = new Set<string>();
   const cells = new Map<string, Map<string, number>>();
   const totals = new Map<string, number>();
   for (const row of rows) {
     const category = xDimensions.length > 0 ? label(row, xDimensions) : humanize(measure.name);
-    if (!seen.has(category)) {
-      seen.add(category);
-      categories.push(category);
-    }
+    categories.add(category);
     for (const m of plotted) {
       const seriesKey = seriesDimensions.length > 0 ? label(row, seriesDimensions) : humanize(m.name);
       const value = row[m.name];
@@ -116,16 +133,17 @@ export function toCategoryChart(result: AggregateResponse, kind: 'bar' | 'line')
   const kept = ranked.length > MAX_SERIES ? ranked.slice(0, MAX_SERIES - 1) : ranked;
   const folded = ranked.slice(kept.length);
 
+  const order = [...categories];
   const series: Series[] = kept.map((key, index) => ({
     label: key,
-    slot: index + 1,
-    values: categories.map((c) => cells.get(key)?.get(c) ?? null),
+    ...slot(index + 1),
+    values: order.map((c) => cells.get(key)?.get(c) ?? null),
   }));
   if (folded.length > 0) {
     series.push({
       label: 'Other',
-      slot: MAX_SERIES,
-      values: categories.map((c) => {
+      ...slot(MAX_SERIES),
+      values: order.map((c) => {
         const values = folded.map((key) => cells.get(key)?.get(c)).filter((v) => v !== undefined);
         return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) : null;
       }),
@@ -133,10 +151,14 @@ export function toCategoryChart(result: AggregateResponse, kind: 'bar' | 'line')
   }
 
   const values = series.flatMap((s) => s.values).filter((v) => v !== null);
-  return { categories, series, measure, caption, min: Math.min(0, ...values), max: Math.max(0, ...values) };
+  return { categories: order, series, measure, caption, min: Math.min(0, ...values), max: Math.max(0, ...values) };
 }
 
-function compareRows(a: AggregateResponse['rows'][number], b: AggregateResponse['rows'][number], columns: ResultColumn[]): number {
+function slot(slot: number): Pick<Series, 'slot' | 'color'> {
+  return { slot, color: `var(--series-${slot})` };
+}
+
+function compareRows(a: ResultRow, b: ResultRow, columns: ResultColumn[]): number {
   for (const column of columns) {
     const left = a[column.name] ?? null;
     const right = b[column.name] ?? null;

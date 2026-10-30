@@ -24,6 +24,9 @@ img,
   aspect-ratio: 4 / 3;
   margin-bottom: 0.4rem;
   border-radius: var(--radius-sm);
+}
+
+img {
   background: #fff;
   object-fit: contain;
 }

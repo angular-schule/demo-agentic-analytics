@@ -1,12 +1,59 @@
 import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import { and, asc, eq, ilike, isNotNull, SQL } from 'drizzle-orm';
+import { ApiNotFoundResponse, ApiOkResponse, ApiParam, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { and, asc, eq, ilike, SQL, sql } from 'drizzle-orm';
 import type { FastifyReply } from 'fastify';
 import { products, resellers } from '../db/analytics.schema';
 import { DrizzleService } from '../db/drizzle.service';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 200;
+
+export class ProductSummary {
+  @ApiProperty({ type: 'integer', format: 'int32' }) productKey!: number;
+  @ApiProperty({ type: String }) productName!: string;
+  @ApiProperty({ type: String, nullable: true }) productSubcategory!: string | null;
+  @ApiProperty({ type: String, nullable: true }) productCategory!: string | null;
+  @ApiProperty({ type: String, nullable: true }) color!: string | null;
+  @ApiProperty({ type: 'number', format: 'double', nullable: true }) listPrice!: number | null;
+  @ApiProperty({ type: Boolean }) hasPhoto!: boolean;
+}
+
+export class ProductDetail {
+  @ApiProperty({ type: 'integer', format: 'int32' }) productKey!: number;
+  @ApiProperty({ type: String }) productName!: string;
+  @ApiProperty({ type: String, nullable: true }) modelName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) productSubcategory!: string | null;
+  @ApiProperty({ type: String, nullable: true }) productCategory!: string | null;
+  @ApiProperty({ type: String, nullable: true }) color!: string | null;
+  @ApiProperty({ type: 'number', format: 'double', nullable: true }) listPrice!: number | null;
+  @ApiProperty({ type: String, nullable: true }) description!: string | null;
+  @ApiProperty({ type: Boolean }) hasPhoto!: boolean;
+}
+
+export class ResellerSummary {
+  @ApiProperty({ type: 'integer', format: 'int32' }) resellerKey!: number;
+  @ApiProperty({ type: String }) resellerName!: string;
+  @ApiProperty({ type: String }) businessType!: string;
+  @ApiProperty({ type: String, nullable: true }) city!: string | null;
+  @ApiProperty({ type: String, nullable: true }) stateProvince!: string | null;
+  @ApiProperty({ type: String, nullable: true }) country!: string | null;
+  @ApiProperty({ type: 'integer', format: 'int32', nullable: true }) numberEmployees!: number | null;
+  @ApiProperty({ type: 'number', format: 'double', nullable: true }) annualRevenue!: number | null;
+  @ApiProperty({ type: 'integer', format: 'int32', nullable: true }) yearOpened!: number | null;
+}
+
+const LIMIT_QUERY = { name: 'limit', required: false, schema: { type: 'integer', format: 'int32' } } as const;
+const PRODUCT_KEY = { name: 'productKey', schema: { type: 'integer', format: 'int32' } } as const;
+
+const productSummaryColumns = {
+  productKey: products.productKey,
+  productName: products.productName,
+  productSubcategory: products.productSubcategory,
+  productCategory: products.productCategory,
+  color: products.color,
+  listPrice: products.listPrice,
+  hasPhoto: sql<boolean>`${products.largePhoto} is not null`,
+};
 
 /** Product catalogue and reseller directory: plain lookups next to the aggregations. */
 @ApiTags('catalog')
@@ -15,21 +62,21 @@ export class CatalogController {
   constructor(private readonly drizzle: DrizzleService) {}
 
   @Get('products')
-  async listProducts(@Query('search') search?: string, @Query('category') category?: string, @Query('limit') limit?: string) {
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'category', required: false, type: String })
+  @ApiQuery(LIMIT_QUERY)
+  @ApiOkResponse({ type: [ProductSummary] })
+  async listProducts(
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ): Promise<ProductSummary[]> {
     const conditions: SQL[] = [];
     if (search?.trim()) conditions.push(ilike(products.productName, containsPattern(search)));
     if (category?.trim()) conditions.push(eq(products.productCategory, category));
 
     return this.drizzle.db
-      .select({
-        productKey: products.productKey,
-        productName: products.productName,
-        productSubcategory: products.productSubcategory,
-        productCategory: products.productCategory,
-        color: products.color,
-        listPrice: products.listPrice,
-        hasPhoto: isNotNull(products.largePhoto),
-      })
+      .select(productSummaryColumns)
       .from(products)
       .where(and(...conditions))
       .orderBy(asc(products.productName), asc(products.productKey))
@@ -37,19 +84,12 @@ export class CatalogController {
   }
 
   @Get('products/:productKey')
-  async getProduct(@Param('productKey', ParseIntPipe) productKey: number) {
+  @ApiParam(PRODUCT_KEY)
+  @ApiOkResponse({ type: ProductDetail })
+  @ApiNotFoundResponse()
+  async getProduct(@Param('productKey', ParseIntPipe) productKey: number): Promise<ProductDetail> {
     const [product] = await this.drizzle.db
-      .select({
-        productKey: products.productKey,
-        productName: products.productName,
-        modelName: products.modelName,
-        productSubcategory: products.productSubcategory,
-        productCategory: products.productCategory,
-        color: products.color,
-        listPrice: products.listPrice,
-        description: products.description,
-        hasPhoto: isNotNull(products.largePhoto),
-      })
+      .select({ ...productSummaryColumns, modelName: products.modelName, description: products.description })
       .from(products)
       .where(eq(products.productKey, productKey));
     if (!product) throw new NotFoundException();
@@ -57,22 +97,31 @@ export class CatalogController {
   }
 
   @Get('products/:productKey/photo')
+  @ApiParam(PRODUCT_KEY)
+  @ApiOkResponse({ content: { 'image/gif': { schema: { type: 'string', format: 'binary' } } } })
+  @ApiNotFoundResponse()
   async getPhoto(@Param('productKey', ParseIntPipe) productKey: number, @Res() reply: FastifyReply) {
     const [row] = await this.drizzle.db
       .select({ photo: products.largePhoto })
       .from(products)
       .where(eq(products.productKey, productKey));
     if (!row?.photo) throw new NotFoundException();
-    return reply.type('image/gif').send(row.photo);
+    // Product photos practically never change; browsers may reuse one for an hour.
+    return reply.type('image/gif').header('cache-control', 'public, max-age=3600').send(row.photo);
   }
 
   @Get('resellers')
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'country', required: false, type: String })
+  @ApiQuery({ name: 'businessType', required: false, type: String })
+  @ApiQuery(LIMIT_QUERY)
+  @ApiOkResponse({ type: [ResellerSummary] })
   async listResellers(
     @Query('search') search?: string,
     @Query('country') country?: string,
     @Query('businessType') businessType?: string,
-    @Query('limit') limit?: string,
-  ) {
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ): Promise<ResellerSummary[]> {
     const conditions: SQL[] = [];
     if (search?.trim()) conditions.push(ilike(resellers.resellerName, containsPattern(search)));
     if (country?.trim()) conditions.push(eq(resellers.country, country));
@@ -102,7 +151,6 @@ function containsPattern(search: string): string {
   return `%${search.replace(/[\\%_]/g, '\\$&')}%`;
 }
 
-function clampLimit(limit: string | undefined): number {
-  const value = Number.parseInt(limit ?? '', 10);
-  return Number.isNaN(value) ? DEFAULT_LIMIT : Math.min(Math.max(value, 1), MAX_LIMIT);
+function clampLimit(limit: number | undefined): number {
+  return Math.min(Math.max(limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
 }
