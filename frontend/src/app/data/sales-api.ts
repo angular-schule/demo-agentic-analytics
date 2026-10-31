@@ -44,4 +44,6 @@ export interface AgentInfo {
   /** Mastra or Microsoft Agent Framework. */
   framework: string;
   model: string;
+  /** DEBUG ONLY: whether the agent records its traffic for the traffic window (DEBUG_TRAFFIC). */
+  debugTraffic?: boolean;
 }

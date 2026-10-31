@@ -12,6 +12,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { EnvironmentVariables } from './env.config';
+import { startLlmTrafficProxy } from './debug/llm-traffic';
 import { ProblemDetailsFilter } from './problem-details.filter';
 
 const SWAGGER_UI_DIR = dirname(require.resolve('swagger-ui-dist/package.json'));
@@ -48,6 +49,8 @@ const SWAGGER_PAGE = `<!doctype html>
 </html>`;
 
 async function bootstrap(): Promise<void> {
+  // DEBUG ONLY: records the traffic to the LLM provider for the demo's traffic window (DEBUG_TRAFFIC=off switches it off).
+  await startLlmTrafficProxy();
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new ProblemDetailsFilter());

@@ -2,7 +2,7 @@ import { EventType, type BaseEvent } from '@ag-ui/client';
 import { RunAgentInputSchema } from '@ag-ui/core/schemas';
 import { MastraAgent } from '@ag-ui/mastra';
 import { Agent } from '@mastra/core/agent';
-import { BadRequestException, Body, Controller, Get, Post, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Post, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
@@ -11,6 +11,7 @@ import { DrizzleService } from '../db/drizzle.service';
 import { EnvironmentVariables } from '../env.config';
 import { SalesAggregatorService } from '../semantic/sales-aggregator.service';
 import { SchemaService } from '../semantic/schema.service';
+import { debugTraffic, streamLlmTraffic } from '../debug/llm-traffic';
 import { createInstructions } from './instructions';
 import { createTools } from './tools';
 
@@ -37,8 +38,15 @@ export class AgentController {
   }
 
   @Get('info')
-  info(): { framework: string; model: string } {
-    return { framework: 'Mastra', model: this.model };
+  info(): { framework: string; model: string; debugTraffic: boolean } {
+    return { framework: 'Mastra', model: this.model, debugTraffic };
+  }
+
+  /** DEBUG ONLY: what the agent sends to the LLM provider and what comes back, as server-sent events. */
+  @Get('debug/llm')
+  llmTraffic(@Res() reply: FastifyReply): void {
+    if (!debugTraffic) throw new NotFoundException();
+    streamLlmTraffic(reply.hijack().raw);
   }
 
   /** One AG-UI run: the conversation comes in as RunAgentInput, the answer streams back as server-sent events. */

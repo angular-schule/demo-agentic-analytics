@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgenticAnalytics.Api.Agent;
 using AgenticAnalytics.Api.Data;
+using AgenticAnalytics.Api.Debug;
 using AgenticAnalytics.Api.Endpoints;
 using AgenticAnalytics.Api.Semantic;
 using Anthropic;
@@ -98,10 +99,18 @@ if (model is null)
 else
 {
     var schema = await app.Services.GetRequiredService<SchemaService>().WaitForSchemaAsync(app.Logger);
-    var chatClient = new AnthropicClient { ApiKey = model.ApiKey }.AsIChatClient(model.Name);
+    // DEBUG ONLY: records the traffic to the LLM provider for the demo's traffic window (DEBUG_TRAFFIC=off switches it off).
+    var debugTraffic = LlmTrafficLog.Enabled(app.Configuration);
+    var trafficLog = new LlmTrafficLog();
+    var anthropic = new AnthropicClient { ApiKey = model.ApiKey, Handlers = debugTraffic ? [new LlmTrafficHandler(trafficLog)] : [] };
+    var chatClient = anthropic.AsIChatClient(model.Name);
     var analyst = AnalystAgent.Create(chatClient, schema, app.Services.GetRequiredService<IServiceScopeFactory>(), app.Logger);
     app.MapAGUIServer($"/agent/ag-ui/{AnalystAgent.Id}", analyst).ExcludeFromDescription();
-    app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = model.Id }).ExcludeFromDescription();
+    app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = model.Id, debugTraffic }).ExcludeFromDescription();
+    if (debugTraffic)
+    {
+        app.MapGet("/agent/debug/llm", (CancellationToken ct) => TypedResults.ServerSentEvents(trafficLog.Watch(ct))).ExcludeFromDescription();
+    }
 }
 
 app.Run();

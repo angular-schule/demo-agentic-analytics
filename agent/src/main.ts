@@ -6,6 +6,7 @@ import { MastraAgent } from '@ag-ui/mastra';
 import { Agent } from '@mastra/core/agent';
 import { ALLOWED_ORIGIN, DATA_API_URL, HOST, MODEL, PORT } from './config.ts';
 import { dataApi, type SalesSchema } from './data-api.ts';
+import { debugTraffic, startLlmTrafficProxy, streamLlmTraffic } from './llm-traffic.ts';
 import { createInstructions } from './instructions.ts';
 import { createTools } from './tools.ts';
 
@@ -13,6 +14,7 @@ const AGENT_ID = 'analyst';
 const MAX_BODY_BYTES = 1_000_000;
 const TOO_LARGE = Symbol('too large');
 
+await startLlmTrafficProxy();
 const schema = await loadSchema();
 const analyst = new Agent({
   id: AGENT_ID,
@@ -80,7 +82,9 @@ const server = createServer((request, response) => {
   if (request.method === 'OPTIONS') {
     response.writeHead(204).end();
   } else if (request.method === 'GET' && path === '/agent/info') {
-    sendJson(response, 200, { framework: 'Mastra', model: MODEL });
+    sendJson(response, 200, { framework: 'Mastra', model: MODEL, debugTraffic });
+  } else if (request.method === 'GET' && path === '/agent/debug/llm' && debugTraffic) {
+    streamLlmTraffic(response);
   } else if (request.method === 'POST' && path === `/agent/ag-ui/${AGENT_ID}`) {
     runAgent(request, response).catch((error: unknown) => {
       console.error(error);

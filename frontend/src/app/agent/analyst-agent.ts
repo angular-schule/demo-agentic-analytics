@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { type CopilotKitConfig, registerFrontendTool } from '@copilotkit/angular';
 import { DashboardStore } from '../dashboard/dashboard-store';
 import { salesViewSchema } from '../data/sales-view';
+import { recordingFetch } from '../debug/agui-traffic';
 import { productCardsRenderer } from './product-cards-renderer';
 import { salesViewRenderer } from './sales-view-renderer';
 
@@ -14,7 +15,8 @@ export const ANALYST_AGENT_ID = 'analyst';
  */
 export const copilotKitConfig: CopilotKitConfig = {
   selfManagedAgents: {
-    [ANALYST_AGENT_ID]: new HttpAgent({ url: `/agent/ag-ui/${ANALYST_AGENT_ID}` }),
+    // DEBUG ONLY: recordingFetch feeds the traffic window; without it, HttpAgent uses fetch.
+    [ANALYST_AGENT_ID]: new HttpAgent({ url: `/agent/ag-ui/${ANALYST_AGENT_ID}`, fetch: recordingFetch }),
   },
   renderToolCalls: [salesViewRenderer, productCardsRenderer],
   enableInspector: false,

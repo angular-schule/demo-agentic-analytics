@@ -18,6 +18,7 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 - **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
 - **Two interchangeable backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
 - **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the backend directly.
+- **A traffic window for learning (debug feature).** Below the chat, the app shows every message on both lines: the AG-UI events between browser and agent, and the requests and streamed answers between agent and LLM provider. Nothing is hidden, so you can see exactly what the model gets.
 
 ## Architecture
 
@@ -86,6 +87,15 @@ MODEL=google/gemini-3-flash-preview # GOOGLE_GENERATIVE_AI_API_KEY
 
 `DATA_SCOPE` in `.env` limits what the backends may see: `*` for everything, or one territory group (`Europe`, `North America`, `Pacific`).
 The restriction is enforced in the database: the views filter by a session value that the backend sets for every connection (read-only session context in SQL Server, a connection parameter in PostgreSQL). Without that value the views return no rows.
+
+### The traffic window (debug feature)
+
+The window is on by default, because the demo is meant for learning. It shows the whole conversation, every tool result and the system prompt to whoever opens the app, so **switch it off with `DEBUG_TRAFFIC=off` in `.env`, and remove it from a production application.** Everything that belongs to it is marked `DEBUG ONLY`:
+
+- **Browser ↔ agent:** `frontend/src/app/debug/`. The `HttpAgent` gets a `fetch` function that reads a copy of the AG-UI event stream.
+- **Agent ↔ LLM provider, Node.js:** `llm-traffic.ts` in `backends/node/src/debug/` and `agent/src/`. A small proxy on a free port of 127.0.0.1 in the same process; `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` point the provider SDKs at it. Google models are not recorded, their SDK has no such variable.
+- **Agent ↔ LLM provider, .NET:** `backends/dotnet/Debug/LlmTraffic.cs`. A `DelegatingHandler` in the HTTP pipeline of the Anthropic SDK (`Handlers` of the client).
+- Both serve the recorded exchanges as server-sent events under `/agent/debug/llm`. Headers, and with them the API key, are never recorded.
 
 ## Development without Docker
 

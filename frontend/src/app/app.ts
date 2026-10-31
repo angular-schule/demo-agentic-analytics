@@ -1,7 +1,9 @@
 import { httpResource } from '@angular/common/http';
-import { Component, computed } from '@angular/core';
+import { Component, computed, effect } from '@angular/core';
 import { ChatPanel } from './chat/chat-panel';
 import { Dashboard } from './dashboard/dashboard';
+import { agUiTrafficEnabled } from './debug/agui-traffic';
+import { TrafficPanel } from './debug/traffic-panel';
 import type { AgentInfo, DataBackendHealth } from './data/sales-api';
 
 const BACKENDS: Record<DataBackendHealth['backend'], string> = {
@@ -11,7 +13,7 @@ const BACKENDS: Record<DataBackendHealth['backend'], string> = {
 
 @Component({
   selector: 'app-root',
-  imports: [ChatPanel, Dashboard],
+  imports: [ChatPanel, Dashboard, TrafficPanel],
   template: `
     <header class="topbar">
       <div class="brand">
@@ -42,6 +44,10 @@ const BACKENDS: Record<DataBackendHealth['backend'], string> = {
       <app-chat-panel />
       <app-dashboard />
     </main>
+    <!-- DEBUG ONLY: the traffic window, switched off with DEBUG_TRAFFIC=off. -->
+    @if (debugTraffic()) {
+      <app-traffic-panel />
+    }
   `,
   styleUrl: './app.css',
 })
@@ -61,9 +67,15 @@ export class App {
     return `${framework} · ${model}`;
   });
 
+  protected readonly debugTraffic = computed(() => this.agent.hasValue() && this.agent.value().debugTraffic === true);
+
   protected readonly scope = computed(() => {
     if (!this.health.hasValue()) return null;
     const scope = this.health.value().scope;
     return scope === '*' ? 'all territories' : scope;
   });
+
+  constructor() {
+    effect(() => agUiTrafficEnabled.set(this.debugTraffic()));
+  }
 }
