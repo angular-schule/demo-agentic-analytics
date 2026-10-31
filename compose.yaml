@@ -1,4 +1,4 @@
-# One of two interchangeable data backends is chosen at start-up:
+# One of two interchangeable backends is chosen at start-up:
 #   docker compose --profile dotnet up   -> ASP.NET Core + SQL Server 2025, agent: Microsoft Agent Framework
 #   docker compose --profile node up     -> NestJS + PostgreSQL 17, agent: Mastra
 # Both serve the same HTTP contract from the same AdventureWorksDW data, under the network name
@@ -103,7 +103,7 @@ services:
     profiles: [dotnet, node]
     build: frontend
     environment:
-      # Where /agent goes: the data backend by default, the separate agent service with --profile agent.
+      # Where /agent goes: the backend by default, the separate agent service with --profile agent.
       AGENT_URL: ${AGENT_URL:-http://data-api:8080}
     ports:
       - 127.0.0.1:${WEB_PORT:-8080}:80

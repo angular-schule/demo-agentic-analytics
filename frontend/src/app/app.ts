@@ -50,7 +50,7 @@ export class App {
   protected readonly agent = httpResource<AgentInfo>(() => '/agent/info');
 
   protected readonly backend = computed(() => {
-    if (!this.health.hasValue()) return this.health.error() ? 'Data backend offline' : 'Data backend …';
+    if (!this.health.hasValue()) return this.health.error() ? 'Backend offline' : 'Backend …';
     const { backend, database } = this.health.value();
     return `${BACKENDS[backend]} · ${database}`;
   });

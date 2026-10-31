@@ -8,7 +8,7 @@ process.env['MASTRA_TELEMETRY_DISABLED'] ??= '1';
  */
 export const MODEL = process.env['MODEL'] ?? 'anthropic/claude-sonnet-5-5';
 
-/** Base URL of the data backend (.NET or Node, same contract). */
+/** Base URL of the backend (.NET or Node, same contract). */
 export const DATA_API_URL = (process.env['DATA_API_URL'] ?? 'http://127.0.0.1:8081').replace(/\/$/, '');
 
 export const PORT = Number(process.env['PORT'] ?? 4111);

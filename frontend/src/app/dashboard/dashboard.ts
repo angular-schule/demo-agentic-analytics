@@ -9,7 +9,7 @@ import { DashboardTile } from './dashboard-tile';
     <header>
       <div>
         <h2>Dashboard</h2>
-        <p>Pinned views query the data backend directly, without the language model.</p>
+        <p>Pinned views query the backend directly, without the LLM.</p>
       </div>
       @if (store.tiles().length > 0) {
         <button type="button" class="clear" (click)="store.clear()">Clear</button>

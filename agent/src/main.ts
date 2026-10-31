@@ -95,14 +95,14 @@ server.listen(PORT, HOST, () => {
   console.log(`Agent "${AGENT_ID}" with ${MODEL} on http://${HOST}:${PORT}, data from ${DATA_API_URL}`);
 });
 
-/** The data backend may still be importing when the agent starts, so the schema is retried. */
+/** The backend may still be importing when the agent starts, so the schema is retried. */
 async function loadSchema(): Promise<SalesSchema> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await dataApi.schema();
     } catch (error) {
       if (attempt === 60) throw error;
-      console.log(`Waiting for the data backend at ${DATA_API_URL} …`);
+      console.log(`Waiting for the backend at ${DATA_API_URL} …`);
       await sleep(5000);
     }
   }

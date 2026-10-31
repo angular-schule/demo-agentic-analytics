@@ -8,8 +8,8 @@ const tileSchema = salesViewSchema.extend({ id: z.string() });
 export type DashboardTile = z.infer<typeof tileSchema>;
 
 /**
- * The pinned views. A tile stores the query, not the numbers: the dashboard asks the data backend
- * again on every visit, without the language model.
+ * The pinned views. A tile stores the query, not the numbers: the dashboard asks the backend
+ * again on every visit, without the LLM.
  */
 @Injectable({ providedIn: 'root' })
 export class DashboardStore {

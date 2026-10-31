@@ -5,7 +5,7 @@ import { DataApiError, dataApi, type SalesSchema } from './data-api.ts';
 const CHART_KINDS = ['bar', 'line', 'table', 'kpi'] as const;
 
 /**
- * Builds the agent's tools from the semantic layer the data backend publishes. Dimension and
+ * Builds the agent's tools from the semantic layer the backend publishes. Dimension and
  * measure names become enums, so the model sees exactly the names that exist. The backend checks
  * every request again; its error message goes back to the model.
  */
@@ -78,15 +78,15 @@ export function createTools(schema: SalesSchema) {
 
 /**
  * Every failure becomes a tool result: the model can correct a rejected request or tell the user
- * that the data backend is unavailable, and the chat card shows the message instead of waiting.
+ * that the backend is unavailable, and the chat card shows the message instead of waiting.
  */
 async function orError<T>(call: () => Promise<T>): Promise<T | { error: string }> {
   try {
     return await call();
   } catch (error) {
     if (error instanceof DataApiError) return { error: error.message };
-    if (error instanceof DOMException && error.name === 'TimeoutError') return { error: 'The data backend did not answer in time.' };
+    if (error instanceof DOMException && error.name === 'TimeoutError') return { error: 'The backend did not answer in time.' };
     console.error(error);
-    return { error: 'The data backend is not reachable.' };
+    return { error: 'The backend is not reachable.' };
   }
 }

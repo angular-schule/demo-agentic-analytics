@@ -1,7 +1,7 @@
 # Agentic Analytics with Angular
 
 Ask a sales database questions in plain language and get charts back, right inside an Angular app.
-Pin the answers you like to a dashboard that keeps working without the language model.
+Pin the answers you like to a dashboard that keeps working without the LLM.
 
 The demo accompanies the article **[Agentic Analytics with Angular, CopilotKit and Mastra](https://angular.schule/blog/2026-11-agentic-analytics)** on angular.schule.
 It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analytics App with Angular* ([his demo](https://github.com/manfredsteyer/agentic-sales)) and rebuilt with its own data, its own backends and a strong focus on data protection.
@@ -13,21 +13,21 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 - **Generative UI with Angular and CopilotKit.** The agent's tool calls are rendered as Angular components: line, bar and stat charts, tables, and product cards with photos.
 - **AG-UI** as the protocol between the Angular app and the agent, streamed as server-sent events.
 - **The same agent, built twice:** with Mastra (TypeScript) and with the Microsoft Agent Framework (C#). Same system prompt, same two tools, and the tool schemas are generated from the semantic layer, so the model only knows names that exist. The Angular app draws both alike.
-- **The agent in the data backend or as a separate service.** By default it runs in the backend's process: Mastra inside NestJS, the Microsoft Agent Framework inside ASP.NET Core. A separate Mastra service in front of either backend is one profile away.
+- **The agent in the backend or as a separate service.** By default it runs in the backend's process: Mastra inside NestJS, the Microsoft Agent Framework inside ASP.NET Core. A separate Mastra service in front of either backend is one profile away.
 - **A semantic layer instead of SQL.** The model chooses measures, dimensions and filters. It never writes SQL; the backends validate every request and pass values as parameters.
 - **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
-- **Two interchangeable data backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
-- **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the data backend directly.
+- **Two interchangeable backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
+- **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the backend directly.
 
 ## Architecture
 
-Default: the agent runs in the data backend.
+Default: the agent runs in the backend.
 
 ```
 Browser (Angular + CopilotKit)
   │  /agent  AG-UI over SSE    /api  pinned tiles, product photos
   ▼                            ▼
-Data backend (one of) ──────────────────────────────▶ LLM provider
+Backend (one of) ───────────────────────────────────▶ LLM provider
   ├─ ASP.NET Core + Microsoft Agent Framework + EF Core ─▶ SQL Server 2025
   └─ NestJS + Mastra + Drizzle ──────────────────────────▶ PostgreSQL 17
 ```
@@ -35,7 +35,7 @@ Data backend (one of) ───────────────────�
 With the profile `agent`: a separate Mastra service between browser and backend.
 
 ```
-Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Data backend (one of)
+Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Backend (one of)
    └────── /api ──────────────────────────────────────────▶
 ```
 
@@ -53,7 +53,7 @@ Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Da
 Requirements: Docker with Compose, and an API key of an LLM provider.
 
 ```bash
-cp .env.example .env              # database passwords and the data scope
+cp .env.example .env              # database passwords and DATA_SCOPE
 cp agent/.env.example agent/.env  # model and API key
 
 docker compose --profile node up --build     # NestJS + Mastra + PostgreSQL
@@ -67,7 +67,7 @@ The agent as a separate Mastra service, in front of either backend:
 AGENT_URL=http://agent:4111 docker compose --profile node --profile agent up --build
 ```
 
-Then open <http://localhost:8080>. The data backend's Swagger UI opens at <http://localhost:8081> (.NET) or <http://localhost:8082> (Node).
+Then open <http://localhost:8080>. The backend's Swagger UI opens at <http://localhost:8081> (.NET) or <http://localhost:8082> (Node).
 The first start imports the AdventureWorks data and takes a few minutes.
 SQL Server is published for amd64 only; on Apple Silicon it runs emulated and needs about 2 GB of memory for the Docker VM.
 

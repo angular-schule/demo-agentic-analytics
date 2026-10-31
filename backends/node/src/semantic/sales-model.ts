@@ -26,7 +26,7 @@ export interface MeasureDefinition {
 
 /**
  * The semantic layer over analytics.sales: the complete list of dimensions and measures a caller
- * (in the end, a language model) may use. Names outside these lists are rejected, so no request
+ * (in the end, an LLM) may use. Names outside these lists are rejected, so no request
  * can reach a column that is not listed here.
  */
 export const DIMENSIONS: readonly DimensionDefinition[] = [

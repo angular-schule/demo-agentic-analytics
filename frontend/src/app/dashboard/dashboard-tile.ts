@@ -4,7 +4,7 @@ import { SalesChart } from '../charts/sales-chart';
 import { AGGREGATE_URL, type AggregateResponse } from '../data/sales-api';
 import type { DashboardTile as Tile } from './dashboard-store';
 
-/** One pinned view. It asks the data backend directly, so it costs no tokens and stays current. */
+/** One pinned view. It asks the backend directly, so it costs no tokens and stays current. */
 @Component({
   selector: 'app-dashboard-tile',
   imports: [SalesChart],
@@ -13,7 +13,7 @@ import type { DashboardTile as Tile } from './dashboard-store';
       [title]="tile().title"
       [kind]="tile().chart"
       [result]="data.hasValue() ? data.value() : undefined"
-      [message]="data.error() ? 'The data backend could not answer this query.' : 'Loading …'"
+      [message]="data.error() ? 'The backend could not answer this query.' : 'Loading …'"
     >
       <button type="button" class="remove" [attr.aria-label]="'Remove ' + tile().title" (click)="remove.emit()">×</button>
     </app-sales-chart>

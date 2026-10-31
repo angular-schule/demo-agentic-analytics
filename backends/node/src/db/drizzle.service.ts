@@ -5,7 +5,7 @@ import postgres from 'postgres';
 import { EnvironmentVariables } from '../env.config';
 
 /**
- * Database access for the whole backend. Every connection of the pool announces its data scope as
+ * Database access for the whole backend. Every connection of the pool announces its territory scope (row-level security) as
  * the startup parameter analytics.territory_group; the analytics views return no rows without it.
  */
 @Injectable()

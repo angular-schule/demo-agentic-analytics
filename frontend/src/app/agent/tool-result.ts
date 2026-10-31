@@ -3,8 +3,8 @@ import type { AngularToolCall } from '@copilotkit/angular';
 export type ToolResult<T> = { value: T; error?: undefined } | { value?: undefined; error: string };
 
 /**
- * Reads the result of a server tool. The agent's tools answer with JSON: their data, or
- * `{ error }` when the data backend refused or failed. Mastra itself answers arguments that fail
+ * Reads the result of a backend tool. The agent's tools answer with JSON: their data, or
+ * `{ error }` when the backend refused or failed. Mastra itself answers arguments that fail
  * the tool's schema with `{ error: true, message }`. Returns undefined while the call runs.
  */
 export function readToolResult<T, A extends Record<string, unknown>>(

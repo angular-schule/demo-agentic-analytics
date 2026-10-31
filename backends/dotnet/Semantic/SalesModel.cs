@@ -25,7 +25,7 @@ public sealed record MeasureDefinition(
 
 /// <summary>
 /// The semantic layer over analytics.Sales: the complete list of dimensions and measures a caller
-/// (in the end, a language model) may use. Names outside these lists are rejected, so no request
+/// (in the end, an LLM) may use. Names outside these lists are rejected, so no request
 /// can reach a column that is not listed here.
 /// </summary>
 public static class SalesModel

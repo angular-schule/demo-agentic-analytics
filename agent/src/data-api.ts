@@ -48,7 +48,7 @@ export interface ProductSummary {
 }
 
 /**
- * A request the data backend rejected. The message is the problem detail, which names the allowed
+ * A request the backend rejected. The message is the problem detail, which names the allowed
  * values, so the model can correct its next call.
  */
 export class DataApiError extends Error {}

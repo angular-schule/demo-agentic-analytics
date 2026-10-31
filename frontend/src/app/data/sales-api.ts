@@ -1,5 +1,5 @@
 /**
- * The HTTP contract of the data backend. The browser asks it directly, without the language model:
+ * The HTTP contract of the backend. The browser asks it directly, without the LLM:
  * dashboard tiles re-run their saved queries, product cards load their photos.
  */
 export const AGGREGATE_URL = '/api/sales/aggregate';

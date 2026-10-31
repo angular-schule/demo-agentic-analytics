@@ -9,7 +9,7 @@ const findProductsSchema = z.object({ search: z.string(), limit: z.number().opti
 type FindProductsArgs = z.infer<typeof findProductsSchema>;
 
 /**
- * Draws the agent's findProducts calls as cards. The photos load straight from the data backend:
+ * Draws the agent's findProducts calls as cards. The photos load straight from the backend:
  * the model only ever sees product keys and names, never the images.
  */
 @Component({

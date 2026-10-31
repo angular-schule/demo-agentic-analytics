@@ -15,7 +15,7 @@ public sealed record QueryLimits(int MaxGroupBy, int MaxFilters, int DefaultLimi
 public sealed record SchemaResponse(DatasetInfo Dataset, IReadOnlyList<DimensionInfo> Dimensions, IReadOnlyList<MeasureInfo> Measures, QueryLimits Limits);
 
 /// <summary>
-/// Describes the semantic layer for the language model: which dimensions and measures exist, and for
+/// Describes the semantic layer for the LLM: which dimensions and measures exist, and for
 /// small dimensions the exact values, so filters can use them verbatim. The data does not change while
 /// the backend runs, so the schema is built once; a failed attempt is retried on the next call.
 /// </summary>

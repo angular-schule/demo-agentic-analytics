@@ -4,7 +4,7 @@ export const CHART_KINDS = ['bar', 'line', 'table', 'kpi'] as const;
 export type ChartKind = (typeof CHART_KINDS)[number];
 
 /**
- * A saved view: what to ask the data backend and how to show it. It is the argument of the agent's
+ * A saved view: what to ask the backend and how to show it. It is the argument of the agent's
  * querySales tool and the content of a dashboard tile, so a tile can be re-run without the model.
  */
 export const salesViewSchema = z.object({

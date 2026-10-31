@@ -46,7 +46,7 @@ export class SchemaResponse {
 }
 
 /**
- * Describes the semantic layer for the language model: which dimensions and measures exist, and for
+ * Describes the semantic layer for the LLM: which dimensions and measures exist, and for
  * small dimensions the exact values, so filters can use them verbatim.
  */
 @Injectable()
@@ -96,7 +96,7 @@ export class SchemaService {
         description:
           'Order lines of a fictitious bicycle manufacturer, sold online to consumers and through resellers. Contains no data about natural persons.',
         currency: 'USD',
-        // Without rows (a data scope with no sales) both backends report the smallest date.
+        // Without rows (a territory scope without sales) both backends report the smallest date.
         from: period?.from ?? '0001-01-01',
         to: period?.to ?? '0001-01-01',
         scope: this.config.get('DATA_SCOPE', { infer: true }),
