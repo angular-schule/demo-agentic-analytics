@@ -42,7 +42,15 @@ public static class AnalystAgent
     public static AIAgent Create(IChatClient model, SchemaResponse schema, IServiceScopeFactory scopes, ILogger logger)
     {
         var schemaOptions = new AIJsonSchemaCreateOptions { TransformSchemaNode = (context, node) => Describe(schema, context, node) };
-        AIFunctionFactoryOptions Tool(string name) => new() { Name = name, SerializerOptions = Json, JsonSchemaCreateOptions = schemaOptions };
+        // Tool results go to the model as compact JSON strings. Left as objects, the Anthropic adapter writes
+        // them with the indented default options of Microsoft.Extensions.AI.
+        AIFunctionFactoryOptions Tool(string name) => new()
+        {
+            Name = name,
+            SerializerOptions = Json,
+            JsonSchemaCreateOptions = schemaOptions,
+            MarshalResult = (result, type, _) => new(JsonSerializer.Serialize(result, type ?? typeof(object), Json)),
+        };
 
         [Description("""
             Aggregates the sales data and shows the result to the user as a chart, table or key figure.
@@ -86,7 +94,12 @@ public static class AnalystAgent
             AIFunctionFactory.Create(QuerySales, Tool("querySales")),
             AIFunctionFactory.Create(FindProducts, Tool("findProducts")),
         ];
-        return model.AsAIAgent(name: Id, instructions: Instructions(schema), tools: tools);
+        // The Anthropic adapter limits answers to 1024 tokens unless the request sets a limit.
+        return model
+            .AsBuilder()
+            .ConfigureOptions(options => options.MaxOutputTokens ??= 8192)
+            .Build()
+            .AsAIAgent(name: Id, instructions: Instructions(schema), tools: tools);
     }
 
     /// <summary>
