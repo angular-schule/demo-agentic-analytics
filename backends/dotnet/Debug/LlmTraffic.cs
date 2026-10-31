@@ -25,7 +25,9 @@ public sealed class LlmTrafficLog
     private readonly List<ChannelWriter<LlmExchange>> listeners = [];
     private int nextId;
 
-    public static bool Enabled(IConfiguration configuration) => configuration["DEBUG_TRAFFIC"] != "off";
+    // Anything that reads as "no" switches it off, so a typo never leaves it on by accident.
+    public static bool Enabled(IConfiguration configuration) =>
+        configuration["DEBUG_TRAFFIC"]?.Trim().ToLowerInvariant() is not ("off" or "false" or "0" or "no");
 
     public LlmExchange Start(string method, string url, JsonElement? request)
     {
@@ -119,20 +121,21 @@ public sealed class LlmTrafficHandler(LlmTrafficLog log) : DelegatingHandler
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             var read = await inner.ReadAsync(buffer, ct);
-            Record(buffer.Span[..read]);
+            Record(buffer.Span[..read], endOfStream: read == 0 && !buffer.IsEmpty);
             return read;
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
             var read = inner.Read(buffer, offset, count);
-            Record(buffer.AsSpan(offset, read));
+            Record(buffer.AsSpan(offset, read), endOfStream: read == 0 && count > 0);
             return read;
         }
 
-        private void Record(ReadOnlySpan<byte> bytes)
+        // A zero-byte read into an empty buffer only waits for data; the stream ends when a real read returns nothing.
+        private void Record(ReadOnlySpan<byte> bytes, bool endOfStream)
         {
-            if (bytes.IsEmpty)
+            if (endOfStream)
             {
                 Complete();
                 return;

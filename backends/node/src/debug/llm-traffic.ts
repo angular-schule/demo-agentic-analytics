@@ -2,14 +2,15 @@
 // least set DEBUG_TRAFFIC=off: it shows every prompt, tool result and answer to whoever opens the app.
 //
 // A small proxy in this process records what the agent sends to the LLM provider and what comes
-// back. The provider SDKs read their base URL from ANTHROPIC_BASE_URL and OPENAI_BASE_URL, so
-// pointing those at the proxy is enough; the agent code stays unchanged. Headers, and with them the
+// back. Mastra's model router reads each provider's base URL from <PROVIDER>_BASE_URL, so pointing
+// those at the proxy is enough; the agent code stays unchanged. Headers, and with them the
 // API key, are forwarded but never recorded.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-export const debugTraffic = process.env['DEBUG_TRAFFIC'] !== 'off';
+// Anything that reads as "no" switches it off, so a typo never leaves it on by accident.
+export const debugTraffic = !['off', 'false', '0', 'no'].includes((process.env['DEBUG_TRAFFIC'] ?? 'on').trim().toLowerCase());
 
 /** One request to the LLM provider and its answer, sent to the browser twice: when it starts and when it ends. */
 export interface LlmExchange {
@@ -26,6 +27,8 @@ export interface LlmExchange {
 const PROVIDERS = [
   { name: 'anthropic', variable: 'ANTHROPIC_BASE_URL', defaultUrl: 'https://api.anthropic.com/v1' },
   { name: 'openai', variable: 'OPENAI_BASE_URL', defaultUrl: 'https://api.openai.com/v1' },
+  { name: 'google', variable: 'GOOGLE_BASE_URL', defaultUrl: 'https://generativelanguage.googleapis.com/v1beta' },
+  { name: 'mistral', variable: 'MISTRAL_BASE_URL', defaultUrl: 'https://api.mistral.ai/v1' },
 ];
 const KEPT_EXCHANGES = 50;
 const MAX_RESPONSE_CHARS = 500_000;
@@ -40,7 +43,7 @@ let nextId = 1;
 /** Starts the proxy on a free port of 127.0.0.1 and points the provider SDKs at it. */
 export async function startLlmTrafficProxy(): Promise<void> {
   if (!debugTraffic) return;
-  const upstreams = new Map(PROVIDERS.map((p) => [p.name, (process.env[p.variable] ?? p.defaultUrl).replace(/\/$/, '')]));
+  const upstreams = new Map(PROVIDERS.map((p) => [p.name, (process.env[p.variable] || p.defaultUrl).replace(/\/$/, '')]));
   const server = createServer((request, response) => {
     forward(request, response, upstreams).catch((error: unknown) => {
       console.error(error);
@@ -84,8 +87,18 @@ async function forward(request: IncomingMessage, response: ServerResponse, upstr
   for (const [name, value] of Object.entries(request.headers)) {
     if (value !== undefined && !DROPPED_REQUEST_HEADERS.has(name)) headers.set(name, Array.isArray(value) ? value.join(', ') : value);
   }
+  // The agent stopped the run (the user pressed stop or closed the page): stop the provider's answer, too.
+  const abort = new AbortController();
+  response.on('close', () => {
+    if (!response.writableFinished) abort.abort();
+  });
   const started = performance.now();
-  const upstreamResponse = await fetch(url, { method: exchange.method, headers, body: body.length > 0 ? new Uint8Array(body) : undefined });
+  const upstreamResponse = await fetch(url, {
+    method: exchange.method,
+    headers,
+    body: body.length > 0 ? new Uint8Array(body) : undefined,
+    signal: abort.signal,
+  });
   exchange.status = upstreamResponse.status;
 
   upstreamResponse.headers.forEach((value, name) => {
@@ -94,11 +107,14 @@ async function forward(request: IncomingMessage, response: ServerResponse, upstr
   response.writeHead(upstreamResponse.status);
   let text = '';
   const decoder = new TextDecoder();
-  if (upstreamResponse.body) {
-    for await (const chunk of upstreamResponse.body) {
+  try {
+    for await (const chunk of upstreamResponse.body ?? []) {
       response.write(chunk);
       if (text.length < MAX_RESPONSE_CHARS) text += decoder.decode(chunk, { stream: true });
     }
+  } catch (error) {
+    if (!abort.signal.aborted) throw error;
+    text += '\n[stopped by the agent]';
   }
   response.end();
   exchange.response = text.length < MAX_RESPONSE_CHARS ? text + decoder.decode() : `${text.slice(0, MAX_RESPONSE_CHARS)}\n…`;

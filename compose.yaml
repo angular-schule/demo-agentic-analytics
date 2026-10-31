@@ -55,8 +55,6 @@ services:
     environment:
       ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
       DATA_SCOPE: ${DATA_SCOPE:-*}
-      # DEBUG ONLY: the traffic window in the app shows what goes to the LLM. Set DEBUG_TRAFFIC=off in .env to switch it off.
-      DEBUG_TRAFFIC: ${DEBUG_TRAFFIC:-on}
     # MODEL and the provider's API key, see agent/.env.example. This backend talks to Anthropic or OpenAI.
     env_file:
       - path: agent/.env
@@ -76,8 +74,6 @@ services:
     environment:
       DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
       DATA_SCOPE: ${DATA_SCOPE:-*}
-      # DEBUG ONLY: the traffic window in the app shows what goes to the LLM. Set DEBUG_TRAFFIC=off in .env to switch it off.
-      DEBUG_TRAFFIC: ${DEBUG_TRAFFIC:-on}
     # MODEL and the provider's API key, see agent/.env.example.
     env_file:
       - path: agent/.env
@@ -100,8 +96,6 @@ services:
         required: false
     environment:
       DATA_API_URL: http://data-api:8080
-      # DEBUG ONLY: the traffic window in the app shows what goes to the LLM. Set DEBUG_TRAFFIC=off in .env to switch it off.
-      DEBUG_TRAFFIC: ${DEBUG_TRAFFIC:-on}
     ports:
       - 127.0.0.1:4111:4111
 

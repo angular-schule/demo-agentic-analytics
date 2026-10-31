@@ -2,8 +2,8 @@
 // the window shows the whole conversation, every tool result and the agent's answers.
 
 import { JsonPipe } from '@angular/common';
-import { Component, computed, effect, signal } from '@angular/core';
-import { agUiExchanges, agUiTrafficEnabled } from './agui-traffic';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { type AgUiEvent, agUiExchanges } from './agui-traffic';
 
 /** What the agent sent to the LLM provider and what came back, recorded by the backend (or the agent service). */
 interface LlmExchange {
@@ -25,11 +25,13 @@ interface TrafficEntry {
   status?: number;
   durationMs?: number;
   request: unknown;
-  events?: readonly unknown[];
+  events?: readonly AgUiEvent[];
   response?: string;
 }
 
 type Tab = 'ag-ui' | 'llm';
+
+const KEPT_EXCHANGES = 50;
 
 /**
  * Shows the two conversations behind every answer: the browser with the agent (AG-UI events) and
@@ -86,8 +88,8 @@ type Tab = 'ag-ui' | 'llm';
               <ol class="events">
                 @for (event of entry.events; track $index) {
                   <li>
-                    <span class="type">{{ eventType(event) }}</span>
-                    <code>{{ compact(event) }}</code>
+                    <span class="type">{{ event.type }}</span>
+                    <code>{{ event.json }}</code>
                   </li>
                 }
               </ol>
@@ -116,15 +118,19 @@ export class TrafficPanel {
   });
 
   constructor() {
-    effect((onCleanup) => {
-      if (!agUiTrafficEnabled()) return;
-      const source = new EventSource('/agent/debug/llm');
-      source.onmessage = (message: MessageEvent<string>) => {
-        const exchange = JSON.parse(message.data) as LlmExchange;
-        this.llm.update((all) => [exchange, ...all.filter((e) => e.id !== exchange.id)].sort((a, b) => b.id - a.id));
-      };
-      onCleanup(() => source.close());
-    });
+    // The window is only rendered while DEBUG_TRAFFIC is on. The backend resends its kept exchanges on
+    // every (re)connect, with ids that start again after a restart, so the list starts over each time.
+    const source = new EventSource('/agent/debug/llm');
+    source.onopen = () => this.llm.set([]);
+    source.onmessage = (message: MessageEvent<string>) => {
+      const exchange = JSON.parse(message.data) as LlmExchange;
+      this.llm.update((all) => {
+        const index = all.findIndex((e) => e.id === exchange.id);
+        if (index === -1) return [exchange, ...all].slice(0, KEPT_EXCHANGES);
+        return all.map((e, i) => (i === index ? exchange : e));
+      });
+    };
+    inject(DestroyRef).onDestroy(() => source.close());
   }
 
   protected show(tab: Tab): void {
@@ -135,13 +141,5 @@ export class TrafficPanel {
 
   protected select(id: number): void {
     this.selectedId.set(id);
-  }
-
-  protected compact(value: unknown): string {
-    return JSON.stringify(value);
-  }
-
-  protected eventType(event: unknown): string {
-    return typeof event === 'object' && event !== null && 'type' in event ? String(event.type) : '';
   }
 }

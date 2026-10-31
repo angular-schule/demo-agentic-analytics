@@ -118,8 +118,13 @@ else
 
 app.Run();
 
+// The Anthropic adapter limits answers to 1024 tokens unless the request sets a limit.
 static IChatClient AnthropicChatClient(ModelSettings model, DelegatingHandler? recorder) =>
-    new AnthropicClient { ApiKey = model.ApiKey, Handlers = recorder is null ? [] : [recorder] }.AsIChatClient(model.Name);
+    new AnthropicClient { ApiKey = model.ApiKey, Handlers = recorder is null ? [] : [recorder] }
+        .AsIChatClient(model.Name)
+        .AsBuilder()
+        .ConfigureOptions(options => options.MaxOutputTokens ??= 8192)
+        .Build();
 
 // OPENAI_BASE_URL as in the Mastra agent, e.g. https://eu.api.openai.com/v1 for processing in the EU.
 static IChatClient OpenAIChatClient(ModelSettings model, DelegatingHandler? recorder)
@@ -158,7 +163,7 @@ internal sealed record ModelSettings(string Id, string Provider, string Name, st
             reason = $"{keyName} is not set.";
             return null;
         }
-        var baseUrl = provider == "openai" ? configuration["OPENAI_BASE_URL"] : null;
+        var baseUrl = provider == "openai" && configuration["OPENAI_BASE_URL"] is { Length: > 0 } url ? url : null;
         return new ModelSettings(id, provider, id[(provider.Length + 1)..], apiKey, baseUrl);
     }
 }

@@ -10,8 +10,14 @@ export interface AgUiExchange {
   url: string;
   request: unknown;
   status?: number;
-  events: unknown[];
+  events: AgUiEvent[];
   durationMs?: number;
+}
+
+/** One event, with its JSON already written out once, so the window does not re-serialize it on every render. */
+export interface AgUiEvent {
+  type: string;
+  json: string;
 }
 
 const KEPT_EXCHANGES = 50;
@@ -48,20 +54,25 @@ async function readEvents(stream: ReadableStream<Uint8Array>, exchange: AgUiExch
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const blocks = buffer.split('\n\n');
-    buffer = blocks.pop() ?? '';
-    const events = blocks.flatMap((block) =>
-      block
-        .split('\n')
-        .filter((line) => line.startsWith('data:'))
-        .map((line) => parseJson(line.slice(5).trim())),
-    );
-    if (events.length > 0) {
-      exchange.events = [...exchange.events, ...events];
-      update({ ...exchange });
+  try {
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() ?? '';
+      const events = blocks.flatMap((block) =>
+        block
+          .split('\n')
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => toEvent(line.slice(5).trim())),
+      );
+      if (events.length > 0) {
+        exchange.events.push(...events);
+        update({ ...exchange });
+      }
     }
+  } catch {
+    // The user stopped the run: the copy of the stream ends with the original.
+    exchange.events.push({ type: '(stopped)', json: '' });
   }
   exchange.durationMs = Math.round(performance.now() - started);
   update({ ...exchange });
@@ -69,9 +80,16 @@ async function readEvents(stream: ReadableStream<Uint8Array>, exchange: AgUiExch
 
 function update(exchange: AgUiExchange): void {
   agUiExchanges.update((all) => {
-    const others = all.filter((e) => e.id !== exchange.id);
-    return [exchange, ...others].sort((a, b) => b.id - a.id).slice(0, KEPT_EXCHANGES);
+    const index = all.findIndex((e) => e.id === exchange.id);
+    if (index === -1) return [exchange, ...all].slice(0, KEPT_EXCHANGES);
+    return all.map((e, i) => (i === index ? exchange : e));
   });
+}
+
+function toEvent(data: string): AgUiEvent {
+  const event = parseJson(data);
+  const type = typeof event === 'object' && event !== null && 'type' in event ? String(event.type) : '';
+  return { type, json: JSON.stringify(event) };
 }
 
 function parseJson(text: string): unknown {

@@ -94,12 +94,7 @@ public static class AnalystAgent
             AIFunctionFactory.Create(QuerySales, Tool("querySales")),
             AIFunctionFactory.Create(FindProducts, Tool("findProducts")),
         ];
-        // The Anthropic adapter limits answers to 1024 tokens unless the request sets a limit.
-        return model
-            .AsBuilder()
-            .ConfigureOptions(options => options.MaxOutputTokens ??= 8192)
-            .Build()
-            .AsAIAgent(name: Id, instructions: Instructions(schema), tools: tools);
+        return model.AsAIAgent(name: Id, instructions: Instructions(schema), tools: tools);
     }
 
     /// <summary>

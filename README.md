@@ -81,7 +81,7 @@ Mastra's model router knows all providers below; the ASP.NET Core backend talks 
 MODEL=anthropic/claude-sonnet-5-5     # ANTHROPIC_API_KEY
 MODEL=openai/gpt-5.6-terra            # OPENAI_API_KEY, optional OPENAI_BASE_URL=https://eu.api.openai.com/v1 for processing in the EU
 MODEL=google/gemini-3-flash-preview   # GOOGLE_GENERATIVE_AI_API_KEY, Node.js only
-MODEL=mistral/mistral-large-latest    # MISTRAL_API_KEY, Node.js only
+MODEL=mistral/mistral-large-latest    # MISTRAL_API_KEY, optional MISTRAL_BASE_URL=https://api.eu.mistral.ai/v1, Node.js only
 ```
 
 ### Restricting the data
@@ -91,11 +91,11 @@ The restriction is enforced in the database: the views filter by a session value
 
 ### The traffic window (debug feature)
 
-The window is on by default, because the demo is meant for learning. It shows the whole conversation, every tool result and the system prompt to whoever opens the app, so **switch it off with `DEBUG_TRAFFIC=off` in `.env`, and remove it from a production application.** Everything that belongs to it is marked `DEBUG ONLY`:
+The window is on by default, because the demo is meant for learning. It shows the whole conversation, every tool result and the system prompt to whoever opens the app, so **switch it off with `DEBUG_TRAFFIC=off` in `agent/.env`, and remove it from a production application.** Everything that belongs to it is marked `DEBUG ONLY`:
 
 - **Browser ↔ agent:** `frontend/src/app/debug/`. The `HttpAgent` gets a `fetch` function that reads a copy of the AG-UI event stream.
-- **Agent ↔ LLM provider, Node.js:** `llm-traffic.ts` in `backends/node/src/debug/` and `agent/src/`. A small proxy on a free port of 127.0.0.1 in the same process; `ANTHROPIC_BASE_URL` and `OPENAI_BASE_URL` point the provider SDKs at it. Google models are not recorded, their SDK has no such variable.
-- **Agent ↔ LLM provider, .NET:** `backends/dotnet/Debug/LlmTraffic.cs`. A `DelegatingHandler` in the HTTP pipeline of the Anthropic SDK (`Handlers` of the client).
+- **Agent ↔ LLM provider, Node.js:** `llm-traffic.ts` in `backends/node/src/debug/` and `agent/src/`. A small proxy on a free port of 127.0.0.1 in the same process. Mastra's model router reads each provider's base URL from `<PROVIDER>_BASE_URL` (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GOOGLE_BASE_URL`, `MISTRAL_BASE_URL`), so the proxy points these at itself and forwards to the address that was configured before.
+- **Agent ↔ LLM provider, .NET:** `backends/dotnet/Debug/LlmTraffic.cs`. A `DelegatingHandler` in the HTTP pipeline of the Anthropic SDK (`Handlers` of the client) and of OpenAI's SDK (an `HttpClient` as its transport).
 - Both serve the recorded exchanges as server-sent events under `/agent/debug/llm`. Headers, and with them the API key, are never recorded.
 
 ## Development without Docker
