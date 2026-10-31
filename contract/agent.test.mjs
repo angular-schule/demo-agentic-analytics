@@ -1,5 +1,6 @@
 // Agent tests: every agent (Microsoft Agent Framework in ASP.NET Core, Mastra in NestJS, Mastra as a
-// separate service) answers the same AG-UI requests against the fake LLM in contract/fake-llm.mjs.
+// separate service) answers the same AG-UI requests against the fake LLM in contract/fake-llm.mjs,
+// with an Anthropic model and, for both backends, with a model in OpenAI's Chat Completions format.
 // Run with the test setup from compose.test.yaml:  node --test 'contract/*.test.mjs'
 // DOTNET_API_URL, NODE_API_URL, AGENT_SERVICE_URL and FAKE_LLM_URL default to the ports from compose.
 import assert from 'node:assert/strict';
@@ -12,6 +13,8 @@ const agents = {
   'Microsoft Agent Framework (ASP.NET Core)': process.env.DOTNET_API_URL ?? 'http://127.0.0.1:8081',
   'Mastra (NestJS)': dataApi,
   'Mastra (agent service)': process.env.AGENT_SERVICE_URL ?? 'http://127.0.0.1:4111',
+  'Microsoft Agent Framework with Mistral': process.env.DOTNET_MISTRAL_URL ?? 'http://127.0.0.1:8083',
+  'Mastra with Mistral': process.env.NODE_MISTRAL_URL ?? 'http://127.0.0.1:8084',
 };
 const REVENUE_PER_YEAR = { title: 'Revenue per year', chart: 'line', query: { measures: ['revenue'], groupBy: ['year'] } };
 const PIN_TOOL = {
@@ -80,6 +83,27 @@ async function trafficWindow(base) {
   await stop;
   const latest = new Map(parseEvents(received).map((e) => [e.id, e]));
   return { exchanges: [...latest.values()], raw: received };
+}
+
+/** The parts of a provider request that the tests look at, in Anthropic's or OpenAI's format. */
+function request(record) {
+  const { body } = record;
+  if (record.format === 'openai') {
+    const last = body.messages.at(-1);
+    return {
+      system: body.messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : m.content.map((b) => b.text).join(''))).join(''),
+      tools: (body.tools ?? []).map((t) => ({ name: t.function.name, schema: t.function.parameters })),
+      maxTokens: body.max_tokens ?? body.max_completion_tokens,
+      toolResult: last.role === 'tool' ? (typeof last.content === 'string' ? last.content : last.content.map((b) => b.text).join('')) : undefined,
+    };
+  }
+  const toolResult = body.messages.at(-1).content.find?.((b) => b.type === 'tool_result');
+  return {
+    system: Array.isArray(body.system) ? body.system.map((b) => b.text).join('') : body.system,
+    tools: (body.tools ?? []).map((t) => ({ name: t.name, schema: t.input_schema })),
+    maxTokens: body.max_tokens,
+    toolResult: toolResult && (typeof toolResult.content === 'string' ? toolResult.content : toolResult.content.map((b) => b.text).join('')),
+  };
 }
 
 /** Collects every enum in a JSON schema by its path, so schemas from different generators can be compared. */
@@ -152,24 +176,22 @@ for (const [name, base] of Object.entries(agents)) {
     test('the model gets the rules, both tools, compact tool results and room for long answers', async () => {
       await resetFake();
       await run(base, 'Revenue per year, please');
-      const [first, second] = await fakeRequests();
-      const system = Array.isArray(first.body.system) ? first.body.system.map((b) => b.text).join('') : first.body.system;
-      assert.match(system, /Personal data is not part of the data model/);
-      assert.doesNotMatch(system, /language/i, 'a language rule made the model switch languages, see the article');
-      assert.deepEqual(first.body.tools.map((t) => t.name).sort(), ['findProducts', 'querySales']);
-      assert.ok(first.body.max_tokens >= 8192, `max_tokens is ${first.body.max_tokens}`);
-      const toolResult = second.body.messages.at(-1).content.find((b) => b.type === 'tool_result');
-      const content = typeof toolResult.content === 'string' ? toolResult.content : toolResult.content.map((b) => b.text).join('');
-      assert.ok(!content.includes('\n'), 'tool results go to the model as compact JSON');
+      const [first, second] = (await fakeRequests()).map(request);
+      assert.match(first.system, /Personal data is not part of the data model/);
+      assert.doesNotMatch(first.system, /language/i, 'a language rule made the model switch languages, see the article');
+      assert.deepEqual(first.tools.map((t) => t.name).sort(), ['findProducts', 'querySales']);
+      // Anthropic's .NET adapter would otherwise send 1024; OpenAI's format may leave the limit to the provider.
+      if (first.maxTokens !== undefined) assert.ok(first.maxTokens >= 8192, `max_tokens is ${first.maxTokens}`);
+      assert.ok(!second.toolResult.includes('\n'), 'tool results go to the model as compact JSON');
     });
 
     test('the traffic window records the exchange, but not the API key', async () => {
       await run(base, 'Hello');
       const { exchanges, raw } = await trafficWindow(base);
       const last = exchanges.at(-1);
-      assert.match(last.url, /\/messages$/);
+      assert.match(last.url, /\/(messages|chat\/completions)$/);
       assert.equal(last.status, 200);
-      assert.match(last.response, /message_stop/);
+      assert.match(last.response, /message_stop|\[DONE\]/);
       assert.ok(!raw.includes('test-key'), 'the API key must never reach the browser');
     });
 
@@ -187,19 +209,23 @@ for (const [name, base] of Object.entries(agents)) {
   });
 }
 
-test('both backends describe the same agent to the model', async () => {
-  const bodies = [];
-  for (const base of [agents['Microsoft Agent Framework (ASP.NET Core)'], agents['Mastra (NestJS)']]) {
-    await resetFake();
-    await run(base, 'Hello');
-    bodies.push((await fakeRequests())[0].body);
-  }
-  const [dotnet, node] = bodies;
-  const system = (body) => (Array.isArray(body.system) ? body.system.map((b) => b.text).join('') : body.system);
-  assert.equal(system(node), system(dotnet));
-  for (const tool of ['querySales', 'findProducts']) {
-    const schema = (body) => body.tools.find((t) => t.name === tool).input_schema;
-    assert.deepEqual(enums(schema(node)), enums(schema(dotnet)), `enums of ${tool}`);
-    assert.deepEqual(schema(node).required?.sort(), schema(dotnet).required?.sort(), `required fields of ${tool}`);
-  }
-});
+for (const [format, dotnetAgent, nodeAgent] of [
+  ['Anthropic', 'Microsoft Agent Framework (ASP.NET Core)', 'Mastra (NestJS)'],
+  ['OpenAI Chat Completions', 'Microsoft Agent Framework with Mistral', 'Mastra with Mistral'],
+]) {
+  test(`both backends describe the same agent to the model (${format} format)`, async () => {
+    const requests = [];
+    for (const base of [agents[dotnetAgent], agents[nodeAgent]]) {
+      await resetFake();
+      await run(base, 'Hello');
+      requests.push(request((await fakeRequests())[0]));
+    }
+    const [dotnet, node] = requests;
+    assert.equal(node.system, dotnet.system);
+    for (const tool of ['querySales', 'findProducts']) {
+      const schema = (r) => r.tools.find((t) => t.name === tool).schema;
+      assert.deepEqual(enums(schema(node)), enums(schema(dotnet)), `enums of ${tool}`);
+      assert.deepEqual(schema(node).required?.sort(), schema(dotnet).required?.sort(), `required fields of ${tool}`);
+    }
+  });
+}

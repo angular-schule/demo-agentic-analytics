@@ -106,7 +106,7 @@ else
     var debugTraffic = LlmTrafficLog.Enabled(app.Configuration);
     var trafficLog = new LlmTrafficLog();
     var recorder = debugTraffic ? new LlmTrafficHandler(trafficLog) : null;
-    var chatClient = model.Provider == "openai" ? OpenAIChatClient(model, recorder) : AnthropicChatClient(model, recorder);
+    var chatClient = model.Provider == "anthropic" ? AnthropicChatClient(model, recorder) : OpenAIChatClient(model, recorder);
     var analyst = AnalystAgent.Create(chatClient, schema, app.Services.GetRequiredService<IServiceScopeFactory>(), app.Logger);
     app.MapAGUIServer($"/agent/ag-ui/{AnalystAgent.Id}", analyst).ExcludeFromDescription();
     app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = model.Id, debugTraffic }).ExcludeFromDescription();
@@ -118,19 +118,24 @@ else
 
 app.Run();
 
-// The Anthropic adapter limits answers to 1024 tokens unless the request sets a limit.
+// The Anthropic adapter limits answers to 1024 tokens unless the request sets a limit. Mastra's
+// ANTHROPIC_BASE_URL ends in /v1, Anthropic's .NET SDK adds it itself.
 static IChatClient AnthropicChatClient(ModelSettings model, DelegatingHandler? recorder) =>
-    new AnthropicClient { ApiKey = model.ApiKey, Handlers = recorder is null ? [] : [recorder] }
+    new AnthropicClient
+    {
+        ApiKey = model.ApiKey,
+        BaseUrl = model.BaseUrl.EndsWith("/v1", StringComparison.Ordinal) ? model.BaseUrl[..^3] : model.BaseUrl,
+        Handlers = recorder is null ? [] : [recorder],
+    }
         .AsIChatClient(model.Name)
         .AsBuilder()
         .ConfigureOptions(options => options.MaxOutputTokens ??= 8192)
         .Build();
 
-// OPENAI_BASE_URL as in the Mastra agent, e.g. https://eu.api.openai.com/v1 for processing in the EU.
+// OpenAI, and Gemini and Mistral through their OpenAI-compatible endpoints: OpenAI's SDK talks to all three.
 static IChatClient OpenAIChatClient(ModelSettings model, DelegatingHandler? recorder)
 {
-    var options = new OpenAIClientOptions();
-    if (model.BaseUrl is { } baseUrl) options.Endpoint = new Uri(baseUrl);
+    var options = new OpenAIClientOptions { Endpoint = new Uri(model.BaseUrl) };
     if (recorder is not null)
     {
         recorder.InnerHandler = new HttpClientHandler();
@@ -139,32 +144,38 @@ static IChatClient OpenAIChatClient(ModelSettings model, DelegatingHandler? reco
     return new OpenAIClient(new ApiKeyCredential(model.ApiKey), options).GetChatClient(model.Name).AsIChatClient();
 }
 
-/// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5 or openai/gpt-5.6-terra.</param>
-internal sealed record ModelSettings(string Id, string Provider, string Name, string ApiKey, string? BaseUrl)
+/// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5 or mistral/mistral-large-latest.</param>
+/// <param name="BaseUrl">The provider's API; the variables are the ones Mastra reads, so both tracks share agent/.env.</param>
+internal sealed record ModelSettings(string Id, string Provider, string Name, string ApiKey, string BaseUrl)
 {
-    private static readonly Dictionary<string, string> ApiKeys = new()
+    private sealed record ProviderInfo(string ApiKey, string BaseUrlVariable, string DefaultBaseUrl, string Suffix = "");
+
+    private static readonly Dictionary<string, ProviderInfo> Providers = new()
     {
-        ["anthropic"] = "ANTHROPIC_API_KEY",
-        ["openai"] = "OPENAI_API_KEY",
+        ["anthropic"] = new("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1"),
+        ["openai"] = new("OPENAI_API_KEY", "OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        // GOOGLE_BASE_URL is the address of the Gemini API, as for Mastra; its OpenAI-compatible endpoint is below it.
+        ["google"] = new("GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta", "/openai"),
+        ["mistral"] = new("MISTRAL_API_KEY", "MISTRAL_BASE_URL", "https://api.mistral.ai/v1"),
     };
 
     public static ModelSettings? Read(IConfiguration configuration, out string reason)
     {
         var id = configuration["MODEL"] ?? "anthropic/claude-sonnet-5-5";
         reason = "";
-        var provider = id.Split('/')[0];
-        if (!ApiKeys.TryGetValue(provider, out var keyName) || id.Length <= provider.Length + 1)
+        var name = id.Split('/')[0];
+        if (!Providers.TryGetValue(name, out var provider) || id.Length <= name.Length + 1)
         {
-            reason = $"MODEL '{id}' is not an Anthropic or OpenAI model; this backend talks to these two only.";
+            reason = $"MODEL '{id}' names no known provider: anthropic, openai, google or mistral.";
             return null;
         }
-        if (configuration[keyName] is not { Length: > 0 } apiKey)
+        if (configuration[provider.ApiKey] is not { Length: > 0 } apiKey)
         {
-            reason = $"{keyName} is not set.";
+            reason = $"{provider.ApiKey} is not set.";
             return null;
         }
-        var baseUrl = provider == "openai" && configuration["OPENAI_BASE_URL"] is { Length: > 0 } url ? url : null;
-        return new ModelSettings(id, provider, id[(provider.Length + 1)..], apiKey, baseUrl);
+        var baseUrl = configuration[provider.BaseUrlVariable] is { Length: > 0 } url ? url : provider.DefaultBaseUrl;
+        return new ModelSettings(id, name, id[(name.Length + 1)..], apiKey, baseUrl.TrimEnd('/') + provider.Suffix);
     }
 }
 

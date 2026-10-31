@@ -125,6 +125,11 @@ public sealed class LlmTrafficHandler(LlmTrafficLog log) : DelegatingHandler
             return read;
         }
 
+        // Without this override, Stream sends the array overload through a synchronous Read, and the
+        // cancellation of a stopped run never reaches the provider's connection.
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) =>
+            ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();
+
         public override int Read(byte[] buffer, int offset, int count)
         {
             var read = inner.Read(buffer, offset, count);

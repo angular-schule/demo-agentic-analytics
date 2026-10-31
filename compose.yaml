@@ -55,7 +55,7 @@ services:
     environment:
       ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
       DATA_SCOPE: ${DATA_SCOPE:-*}
-    # MODEL and the provider's API key, see agent/.env.example. This backend talks to Anthropic or OpenAI.
+    # MODEL and the provider's API key, see agent/.env.example.
     env_file:
       - path: agent/.env
         required: false

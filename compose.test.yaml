@@ -40,3 +40,41 @@ services:
     depends_on:
       fake-llm:
         condition: service_started
+
+  # The same backends with a model in OpenAI's Chat Completions format (Mistral; OpenAI and Gemini
+  # use the same path in the .NET backend), so both API formats are tested.
+  dotnet-api-mistral:
+    profiles: [dotnet]
+    build: backends/dotnet
+    environment:
+      ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
+      DATA_SCOPE: "*"
+      MODEL: mistral/mistral-large-latest
+      MISTRAL_API_KEY: test-key
+      MISTRAL_BASE_URL: http://fake-llm:4000/v1
+      DEBUG_TRAFFIC: "on"
+    ports:
+      - 127.0.0.1:8083:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      fake-llm:
+        condition: service_started
+
+  node-api-mistral:
+    profiles: [node]
+    build: backends/node
+    environment:
+      DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
+      DATA_SCOPE: "*"
+      MODEL: mistral/mistral-large-latest
+      MISTRAL_API_KEY: test-key
+      MISTRAL_BASE_URL: http://fake-llm:4000/v1
+      DEBUG_TRAFFIC: "on"
+    ports:
+      - 127.0.0.1:8084:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fake-llm:
+        condition: service_started
