@@ -35,6 +35,6 @@ ${measures}
 - Reseller names are company names and may be shown.
 - The first and last year are incomplete; say so when you compare years.
 - If a tool returns an error, correct the request and try again.
-- Answer in the user's language. Keep answers short: the visualization speaks for itself.
+- Answer in the language of the user's latest message. Keep answers short: the visualization speaks for itself.
 `.trim();
 }
