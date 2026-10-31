@@ -5,12 +5,15 @@ using AgenticAnalytics.Api.Data;
 using AgenticAnalytics.Api.Debug;
 using AgenticAnalytics.Api.Endpoints;
 using AgenticAnalytics.Api.Semantic;
+using System.ClientModel;
+using System.ClientModel.Primitives;
 using Anthropic;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.OpenApi;
+using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,8 +105,8 @@ else
     // DEBUG ONLY: records the traffic to the LLM provider for the demo's traffic window (DEBUG_TRAFFIC=off switches it off).
     var debugTraffic = LlmTrafficLog.Enabled(app.Configuration);
     var trafficLog = new LlmTrafficLog();
-    var anthropic = new AnthropicClient { ApiKey = model.ApiKey, Handlers = debugTraffic ? [new LlmTrafficHandler(trafficLog)] : [] };
-    var chatClient = anthropic.AsIChatClient(model.Name);
+    var recorder = debugTraffic ? new LlmTrafficHandler(trafficLog) : null;
+    var chatClient = model.Provider == "openai" ? OpenAIChatClient(model, recorder) : AnthropicChatClient(model, recorder);
     var analyst = AnalystAgent.Create(chatClient, schema, app.Services.GetRequiredService<IServiceScopeFactory>(), app.Logger);
     app.MapAGUIServer($"/agent/ag-ui/{AnalystAgent.Id}", analyst).ExcludeFromDescription();
     app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = model.Id, debugTraffic }).ExcludeFromDescription();
@@ -115,25 +118,48 @@ else
 
 app.Run();
 
-/// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5.</param>
-internal sealed record ModelSettings(string Id, string Name, string ApiKey)
+static IChatClient AnthropicChatClient(ModelSettings model, DelegatingHandler? recorder) =>
+    new AnthropicClient { ApiKey = model.ApiKey, Handlers = recorder is null ? [] : [recorder] }.AsIChatClient(model.Name);
+
+// OPENAI_BASE_URL as in the Mastra agent, e.g. https://eu.api.openai.com/v1 for processing in the EU.
+static IChatClient OpenAIChatClient(ModelSettings model, DelegatingHandler? recorder)
 {
+    var options = new OpenAIClientOptions();
+    if (model.BaseUrl is { } baseUrl) options.Endpoint = new Uri(baseUrl);
+    if (recorder is not null)
+    {
+        recorder.InnerHandler = new HttpClientHandler();
+        options.Transport = new HttpClientPipelineTransport(new HttpClient(recorder) { Timeout = Timeout.InfiniteTimeSpan });
+    }
+    return new OpenAIClient(new ApiKeyCredential(model.ApiKey), options).GetChatClient(model.Name).AsIChatClient();
+}
+
+/// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5 or openai/gpt-5.6-terra.</param>
+internal sealed record ModelSettings(string Id, string Provider, string Name, string ApiKey, string? BaseUrl)
+{
+    private static readonly Dictionary<string, string> ApiKeys = new()
+    {
+        ["anthropic"] = "ANTHROPIC_API_KEY",
+        ["openai"] = "OPENAI_API_KEY",
+    };
+
     public static ModelSettings? Read(IConfiguration configuration, out string reason)
     {
-        const string provider = "anthropic/";
         var id = configuration["MODEL"] ?? "anthropic/claude-sonnet-5-5";
         reason = "";
-        if (!id.StartsWith(provider, StringComparison.Ordinal))
+        var provider = id.Split('/')[0];
+        if (!ApiKeys.TryGetValue(provider, out var keyName) || id.Length <= provider.Length + 1)
         {
-            reason = $"MODEL '{id}' is not an Anthropic model; this backend talks to Anthropic only.";
+            reason = $"MODEL '{id}' is not an Anthropic or OpenAI model; this backend talks to these two only.";
             return null;
         }
-        if (configuration["ANTHROPIC_API_KEY"] is not { Length: > 0 } apiKey)
+        if (configuration[keyName] is not { Length: > 0 } apiKey)
         {
-            reason = "ANTHROPIC_API_KEY is not set.";
+            reason = $"{keyName} is not set.";
             return null;
         }
-        return new ModelSettings(id, id[provider.Length..], apiKey);
+        var baseUrl = provider == "openai" ? configuration["OPENAI_BASE_URL"] : null;
+        return new ModelSettings(id, provider, id[(provider.Length + 1)..], apiKey, baseUrl);
     }
 }
 

@@ -57,7 +57,7 @@ services:
       DATA_SCOPE: ${DATA_SCOPE:-*}
       # DEBUG ONLY: the traffic window in the app shows what goes to the LLM. Set DEBUG_TRAFFIC=off in .env to switch it off.
       DEBUG_TRAFFIC: ${DEBUG_TRAFFIC:-on}
-    # MODEL and the provider's API key, see agent/.env.example. This backend talks to Anthropic only.
+    # MODEL and the provider's API key, see agent/.env.example. This backend talks to Anthropic or OpenAI.
     env_file:
       - path: agent/.env
         required: false

@@ -75,12 +75,13 @@ SQL Server is published for amd64 only; on Apple Silicon it runs emulated and ne
 ### Switching the model
 
 `agent/.env` configures the agent, wherever it runs. Set `MODEL` to `provider/model` and add the provider's key.
-Mastra's model router knows all three providers below; the ASP.NET Core backend talks to Anthropic only, through Anthropic's .NET SDK.
+Mastra's model router knows all providers below; the ASP.NET Core backend talks to Anthropic (Anthropic's .NET SDK) and OpenAI (OpenAI's .NET SDK through Microsoft.Extensions.AI.OpenAI).
 
 ```bash
-MODEL=anthropic/claude-sonnet-5-5   # ANTHROPIC_API_KEY
-MODEL=openai/gpt-5.6-terra          # OPENAI_API_KEY
-MODEL=google/gemini-3-flash-preview # GOOGLE_GENERATIVE_AI_API_KEY
+MODEL=anthropic/claude-sonnet-5-5     # ANTHROPIC_API_KEY
+MODEL=openai/gpt-5.6-terra            # OPENAI_API_KEY, optional OPENAI_BASE_URL=https://eu.api.openai.com/v1 for processing in the EU
+MODEL=google/gemini-3-flash-preview   # GOOGLE_GENERATIVE_AI_API_KEY, Node.js only
+MODEL=mistral/mistral-large-latest    # MISTRAL_API_KEY, Node.js only
 ```
 
 ### Restricting the data
