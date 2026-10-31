@@ -122,6 +122,12 @@ Downloads are pinned to a commit and checked against SHA-256 checksums.
 ## Privacy notes
 
 - The browser talks to one origin only. The app loads no fonts, scripts or telemetry from third parties.
-- Mastra sends usage telemetry by default; the agent service and the NestJS backend switch it off (`MASTRA_TELEMETRY_DISABLED`).
-- The CopilotKit Inspector, which reports usage when opened, is disabled.
+- Telemetry is switched off wherever the demo can switch it off:
+  - Mastra sends usage telemetry to PostHog by default; the agent service and the NestJS backend set `MASTRA_TELEMETRY_DISABLED`.
+  - The CopilotKit Inspector, which reports usage when opened, is disabled.
+  - The .NET CLI reports usage during `dotnet restore` and `dotnet publish`; the Dockerfile sets `DOTNET_CLI_TELEMETRY_OPTOUT`.
+  - `swagger-ui-dist` depends on `@scarf/scarf`, which reports installs from a `postinstall` script; `ignore-scripts=true` in every `.npmrc` keeps it from running. The NestJS Swagger page sets `validatorUrl: null`, so the OpenAPI URL never goes to validator.swagger.io; Swashbuckle does that by default.
+  - The Angular CLI only collects usage data after an opt-in; `angular.json` sets `"analytics": false`.
+  - SQL Server sends usage and diagnostic data to Microsoft, and the free Developer edition cannot switch it off. It holds only the sample data here; in production, use PostgreSQL or a paid edition with `telemetry.customerfeedback = false`.
+- The Microsoft Agent Framework, Microsoft.Extensions.AI, the Anthropic SDK, AG-UI, NestJS, Drizzle, EF Core and PostgreSQL send nothing by themselves. Their OpenTelemetry support only exports where you configure it.
 - Whatever a tool returns goes to the LLM provider. That is why the semantic layer contains no personal data in the first place.

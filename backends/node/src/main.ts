@@ -40,6 +40,8 @@ const SWAGGER_PAGE = `<!doctype html>
     dom_id: '#swagger-ui',
     presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
     layout: 'StandaloneLayout',
+    // Without this, Swagger UI sends the document URL to validator.swagger.io whenever it is not on localhost.
+    validatorUrl: null,
   });
 </script>
 </body>
