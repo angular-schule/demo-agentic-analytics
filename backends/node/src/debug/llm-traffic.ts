@@ -52,6 +52,8 @@ export async function startLlmTrafficProxy(): Promise<void> {
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  // The proxy lives as long as the app; it alone does not keep the process running.
+  server.unref();
   const { port } = server.address() as AddressInfo;
   for (const provider of PROVIDERS) process.env[provider.variable] = `http://127.0.0.1:${port}/${provider.name}`;
 }

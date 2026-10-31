@@ -1,0 +1,42 @@
+# The test setup: every agent talks to a fake LLM instead of a real provider (contract/fake-llm.mjs),
+# so the tests cost nothing and give the same answer every time. Real API keys are not used.
+#
+# Contract tests, both backends and the separate agent service:
+#   docker compose -f compose.yaml -f compose.test.yaml --profile dotnet --profile node --profile agent up -d --build
+# Browser tests, one backend behind the web server:
+#   docker compose -f compose.yaml -f compose.test.yaml --profile node up -d --build
+services:
+  fake-llm:
+    build:
+      context: contract
+      dockerfile_inline: |
+        FROM node:24-alpine
+        COPY fake-llm.mjs /
+        CMD ["node", "/fake-llm.mjs"]
+    ports:
+      - 127.0.0.1:${FAKE_LLM_PORT:-4000}:4000
+
+  dotnet-api:
+    environment: &fake-model
+      MODEL: anthropic/claude-sonnet-5-5
+      ANTHROPIC_API_KEY: test-key
+      ANTHROPIC_BASE_URL: http://fake-llm:4000/v1
+      DEBUG_TRAFFIC: "on"
+    depends_on:
+      fake-llm:
+        condition: service_started
+
+  node-api:
+    environment: *fake-model
+    depends_on:
+      fake-llm:
+        condition: service_started
+
+  agent:
+    environment:
+      <<: *fake-model
+      # Both backends answer under data-api in this setup, so the agent service names one.
+      DATA_API_URL: http://node-api:8080
+    depends_on:
+      fake-llm:
+        condition: service_started

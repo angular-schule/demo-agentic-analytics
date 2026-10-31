@@ -47,7 +47,8 @@ Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Ba
 | `backends/dotnet/` | ASP.NET Core minimal API, EF Core, SQL Server; the agent with the Microsoft Agent Framework in `Agent/` |
 | `backends/node/` | NestJS on Fastify, Drizzle, postgres.js; the agent with Mastra in `src/agent/` |
 | `db/` | Database images: import of AdventureWorksDW, analytics views, read-only role |
-| `contract/` | Tests that compare both backends: OpenAPI documents, answers, and the agent endpoint |
+| `contract/` | Tests that compare both backends and all agents, and the fake LLM they run against |
+| `e2e/` | Browser tests with Playwright |
 
 ## Quick start
 
@@ -118,11 +119,32 @@ cd agent && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start
 cd frontend && DATA_API_URL=http://127.0.0.1:8082 AGENT_URL=http://127.0.0.1:4111 npm start
 ```
 
-With both backends running (.NET on 8081, Node on 8082, each with a model key), the contract tests compare their OpenAPI documents, their answers and their agent endpoints:
+## Tests
+
+The agents are tested against a fake LLM (`contract/fake-llm.mjs`) that imitates Anthropic's Messages API with scripted answers: no API key, no cost, the same result every time. `compose.test.yaml` starts it and points every agent at it.
+
+**Unit tests** need nothing running:
 
 ```bash
+cd frontend && npm test   # Angular with Vitest: view schema, charts, dashboard, tool results, AG-UI recording
+cd agent && npm test      # node:test: the traffic proxy (pass-through, recording without the API key, stop, DEBUG_TRAFFIC)
+```
+
+**Contract and agent tests** compare both backends and run every agent (ASP.NET Core, NestJS, the separate service) through the same scenarios: tool calls whose result matches the API, the frontend tool, rejected requests, product search, what the model receives, the traffic window and stopping a run.
+
+```bash
+docker compose -f compose.yaml -f compose.test.yaml --profile dotnet --profile node --profile agent up -d --build
 node --test 'contract/*.test.mjs'
 ```
+
+**Browser tests** with Playwright drive the app on http://localhost:8080: chart, pinning by button and by chat, the dashboard after a reload without the model, product cards, the traffic window. They use the installed Google Chrome. Start one backend behind the web server (`--profile node` or `--profile dotnet`; add `--profile agent` and `AGENT_URL=http://agent:4111` for the separate agent service):
+
+```bash
+docker compose -f compose.yaml -f compose.test.yaml --profile node up -d --build
+cd e2e && npm ci && npm test
+```
+
+Afterwards, `docker compose --profile node up -d` brings back the real model from `agent/.env`.
 
 ## Data
 

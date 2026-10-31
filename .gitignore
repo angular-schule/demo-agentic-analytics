@@ -5,3 +5,5 @@ bin/
 obj/
 .angular/
 *.bak
+test-results/
+playwright-report/

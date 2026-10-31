@@ -80,8 +80,9 @@ public static class AnalystAgent
             """)]
         async Task<object> FindProducts(
             [Description("Part of the product name, e.g. \"Mountain-200\" or \"helmet\".")] string search,
-            [Description("Between 1 and 24. Default 8.")] int? limit,
-            CancellationToken ct) =>
+            // Optional as in the Mastra tool: a parameter with a default value is not required in the schema.
+            [Description("Between 1 and 24. Default 8.")] int? limit = null,
+            CancellationToken ct = default) =>
             await OrError(logger, async () =>
             {
                 await using var scope = scopes.CreateAsyncScope();
