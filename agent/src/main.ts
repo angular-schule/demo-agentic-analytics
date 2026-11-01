@@ -22,6 +22,9 @@ const analyst = new Agent({
   instructions: createInstructions(schema),
   model: MODEL,
   tools: createTools(schema),
+  // OpenAI's Responses API, which Mastra uses for openai/ models, stores every response for at
+  // least 30 days unless the request says otherwise. The agent keeps no history at the provider.
+  defaultOptions: { providerOptions: { openai: { store: false } } },
 });
 
 /**

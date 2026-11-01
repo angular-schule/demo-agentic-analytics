@@ -48,15 +48,16 @@ Browser ── /agent ──▶ Agent (Mastra, Node.js) ── /api ──▶ Ba
 | `backends/node/` | NestJS on Fastify, Drizzle, postgres.js; the agent with Mastra in `src/agent/` |
 | `db/` | Database images: import of AdventureWorksDW, analytics views, read-only role |
 | `contract/` | Tests that compare both backends and all agents, and the fake LLM they run against |
+| `demo-model/` | A stand-in for an LLM provider without a language model, so the demo runs without an API key |
 | `e2e/` | Browser tests with Playwright |
 
 ## Quick start
 
-Requirements: Docker with Compose, and an API key of an LLM provider.
+Requirements: Docker with Compose. An API key of an LLM provider is optional.
 
 ```bash
 cp .env.example .env              # database passwords and DATA_SCOPE
-cp agent/.env.example agent/.env  # model and API key
+cp agent/.env.example agent/.env  # model and API key; leave it out for the demo model
 
 docker compose --profile node up --build     # NestJS + Mastra + PostgreSQL
 # or
@@ -72,6 +73,13 @@ AGENT_URL=http://agent:4111 docker compose --profile node --profile agent up --b
 Then open <http://localhost:8080>. The backend's Swagger UI opens at <http://localhost:8081> (.NET) or <http://localhost:8082> (Node).
 The first start imports the AdventureWorks data and takes a few minutes.
 SQL Server is published for amd64 only; on Apple Silicon it runs emulated and needs about 2 GB of memory for the Docker VM.
+
+### The demo model (no LLM)
+
+Without `agent/.env`, the agent talks to the demo model (`demo-model/`) instead of an LLM provider, so the app works without an API key and without cost.
+The demo model is no language model. It looks for keywords in the question and maps them to the semantic layer, which it reads from the system prompt: measures and dimensions become `groupBy`, values from the data become filters, "top 10" sets order and limit, a product model or "look like" searches the catalogue, "pin" pins the last chart, questions about people get the refusal from the rules. Every answer starts with "Demo mode, no real LLM", and what it does not understand gets an honest "I cannot answer that" plus revenue per year.
+
+It answers in OpenAI's formats, so every agent reaches it as an OpenAI model without any special code: `agent/demo.env` sets `MODEL=openai/demo-no-llm` and points `OPENAI_BASE_URL` at it. Compose loads `agent/.env` after that file, so a real model there wins.
 
 ### Switching the model
 
@@ -121,16 +129,17 @@ cd frontend && DATA_API_URL=http://127.0.0.1:8082 AGENT_URL=http://127.0.0.1:411
 
 ## Tests
 
-The agents are tested against a fake LLM (`contract/fake-llm.mjs`) that imitates Anthropic's Messages API with scripted answers: no API key, no cost, the same result every time. `compose.test.yaml` starts it and points every agent at it.
+The agents are tested against a fake LLM (`contract/fake-llm.mjs`) with scripted answers: no API key, no cost, the same result every time. It runs on the server of the demo model, which speaks Anthropic's Messages API and OpenAI's Chat Completions and Responses API. `compose.test.yaml` starts it and points every agent at it.
 
 **Unit tests** need nothing running:
 
 ```bash
 cd frontend && npm test   # Angular with Vitest: view schema, charts, dashboard, tool results, AG-UI recording
 cd agent && npm test      # node:test: the traffic proxy (pass-through, recording without the API key, stop, DEBUG_TRAFFIC)
+node --test 'demo-model/*.test.mjs'   # the demo model's keyword matching against the real system prompt
 ```
 
-**Contract and agent tests** compare both backends and run every agent (ASP.NET Core, NestJS, the separate service, and both backends once more with a Mistral model in OpenAI's Chat Completions format) through the same scenarios: tool calls whose result matches the API, the frontend tool, rejected requests, product search, what the model receives, the traffic window and stopping a run.
+**Contract and agent tests** compare both backends and run every agent (ASP.NET Core, NestJS, the separate service, both backends once more with a Mistral model in OpenAI's Chat Completions format, and NestJS with an OpenAI model, which Mastra calls through the Responses API) through the same scenarios: tool calls whose result matches the API, the frontend tool, rejected requests, product search, what the model receives, that the provider is not asked to store the conversation, the traffic window and stopping a run. Both backends also answer the app's example questions with the demo model.
 
 ```bash
 docker compose -f compose.yaml -f compose.test.yaml --profile dotnet --profile node --profile agent up -d --build
@@ -164,3 +173,4 @@ Downloads are pinned to a commit and checked against SHA-256 checksums.
   - SQL Server sends usage and diagnostic data to Microsoft, and the free Developer edition cannot switch it off. It holds only the sample data here; in production, use PostgreSQL or a paid edition with `telemetry.customerfeedback = false`.
 - The Microsoft Agent Framework, Microsoft.Extensions.AI, the Anthropic SDK, AG-UI, NestJS, Drizzle, EF Core and PostgreSQL send nothing by themselves. Their OpenTelemetry support only exports where you configure it.
 - Whatever a tool returns goes to the LLM provider. That is why the semantic layer contains no personal data in the first place.
+- OpenAI's Responses API stores every response for at least 30 days unless the request sets `store: false`. Mastra uses this API for `openai/` models and sends no `store` field, so both Mastra agents set `store: false`. The ASP.NET Core backend uses Chat Completions, where storing is off by default.

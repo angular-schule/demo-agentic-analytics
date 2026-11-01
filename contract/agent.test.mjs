@@ -1,6 +1,8 @@
 // Agent tests: every agent (Microsoft Agent Framework in ASP.NET Core, Mastra in NestJS, Mastra as a
 // separate service) answers the same AG-UI requests against the fake LLM in contract/fake-llm.mjs,
-// with an Anthropic model and, for both backends, with a model in OpenAI's Chat Completions format.
+// with an Anthropic model, for both backends with a model in OpenAI's Chat Completions format, and
+// Mastra with an OpenAI model, which it calls through OpenAI's Responses API. At the end, both
+// backends answer the app's example questions with the demo model (demo-model/demo.mjs).
 // Run with the test setup from compose.test.yaml:  node --test 'contract/*.test.mjs'
 // DOTNET_API_URL, NODE_API_URL, AGENT_SERVICE_URL and FAKE_LLM_URL default to the ports from compose.
 import assert from 'node:assert/strict';
@@ -15,6 +17,11 @@ const agents = {
   'Mastra (agent service)': process.env.AGENT_SERVICE_URL ?? 'http://127.0.0.1:4111',
   'Microsoft Agent Framework with Mistral': process.env.DOTNET_MISTRAL_URL ?? 'http://127.0.0.1:8083',
   'Mastra with Mistral': process.env.NODE_MISTRAL_URL ?? 'http://127.0.0.1:8084',
+  'Mastra with OpenAI': process.env.NODE_OPENAI_URL ?? 'http://127.0.0.1:8085',
+};
+const demoAgents = {
+  'Microsoft Agent Framework': process.env.DOTNET_DEMO_URL ?? 'http://127.0.0.1:8086',
+  Mastra: process.env.NODE_DEMO_URL ?? 'http://127.0.0.1:8087',
 };
 const REVENUE_PER_YEAR = { title: 'Revenue per year', chart: 'line', query: { measures: ['revenue'], groupBy: ['year'] } };
 const PIN_TOOL = {
@@ -85,10 +92,20 @@ async function trafficWindow(base) {
   return { exchanges: [...latest.values()], raw: received };
 }
 
-/** The parts of a provider request that the tests look at, in Anthropic's or OpenAI's format. */
+/** The parts of a provider request that the tests look at, in Anthropic's or one of OpenAI's formats. */
 function request(record) {
   const { body } = record;
-  if (record.format === 'openai') {
+  const textOf = (content) => (typeof content === 'string' ? content : content.map((b) => b.text).join(''));
+  if (record.format === 'responses') {
+    const last = body.input.at(-1);
+    return {
+      system: (body.instructions ?? '') + body.input.filter((i) => i.role === 'system' || i.role === 'developer').map((i) => textOf(i.content)).join(''),
+      tools: (body.tools ?? []).map((t) => ({ name: t.name, schema: t.parameters })),
+      maxTokens: body.max_output_tokens,
+      toolResult: last.type === 'function_call_output' ? textOf(last.output) : undefined,
+    };
+  }
+  if (record.format === 'chat') {
     const last = body.messages.at(-1);
     return {
       system: body.messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : m.content.map((b) => b.text).join(''))).join(''),
@@ -185,13 +202,24 @@ for (const [name, base] of Object.entries(agents)) {
       assert.ok(!second.toolResult.includes('\n'), 'tool results go to the model as compact JSON');
     });
 
+    test('the provider is not asked to store the conversation', async () => {
+      await resetFake();
+      await run(base, 'Revenue per year, please');
+      for (const { format, body } of await fakeRequests()) {
+        // The Responses API stores every response for 30 days unless store is false; Chat Completions only with store: true.
+        if (format === 'responses') assert.equal(body.store, false);
+        else assert.notEqual(body.store, true);
+        assert.equal(body.previous_response_id, undefined);
+      }
+    });
+
     test('the traffic window records the exchange, but not the API key', async () => {
       await run(base, 'Hello');
       const { exchanges, raw } = await trafficWindow(base);
       const last = exchanges.at(-1);
-      assert.match(last.url, /\/(messages|chat\/completions)$/);
+      assert.match(last.url, /\/(messages|chat\/completions|responses)$/);
       assert.equal(last.status, 200);
-      assert.match(last.response, /message_stop|\[DONE\]/);
+      assert.match(last.response, /message_stop|\[DONE\]|response\.completed/);
       assert.ok(!raw.includes('test-key'), 'the API key must never reach the browser');
     });
 
@@ -226,6 +254,34 @@ for (const [format, dotnetAgent, nodeAgent] of [
       const schema = (r) => r.tools.find((t) => t.name === tool).schema;
       assert.deepEqual(enums(schema(node)), enums(schema(dotnet)), `enums of ${tool}`);
       assert.deepEqual(schema(node).required?.sort(), schema(dotnet).required?.sort(), `required fields of ${tool}`);
+    }
+  });
+}
+
+const EXAMPLES = [
+  'How did revenue develop per quarter, split by sales channel?',
+  'Which 10 resellers in Germany bought the most? Show revenue and margin.',
+  'Compare the gross margin of the product categories in Europe in 2013.',
+  'Show me the Mountain-200 bikes.',
+  'Who is the key account manager of our biggest reseller?',
+];
+
+for (const [name, base] of Object.entries(demoAgents)) {
+  describe(`${name} with the demo model`, () => {
+    test('says in the header that no real model is behind it', async () => {
+      const info = await (await fetch(`${base}/agent/info`)).json();
+      assert.equal(info.model, 'openai/demo-no-llm');
+    });
+
+    for (const question of EXAMPLES) {
+      test(`answers "${question}"`, async () => {
+        const events = await run(base, question, { tools: [PIN_TOOL] });
+        assert.equal(ofType(events, 'RUN_ERROR').length, 0);
+        assert.equal(events.at(-1).type, 'RUN_FINISHED');
+        assert.match(text(events), /^Demo mode, no real LLM:/);
+        for (const result of ofType(events, 'TOOL_CALL_RESULT')) assert.equal(JSON.parse(result.content).error, undefined, result.content);
+        assert.equal(ofType(events, 'TOOL_CALL_RESULT').length, question.includes('key account') ? 0 : 1);
+      });
     }
   });
 }

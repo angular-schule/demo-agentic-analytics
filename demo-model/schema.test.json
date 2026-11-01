@@ -1,0 +1,228 @@
+{
+    "dataset": {
+        "name": "AdventureWorks sales",
+        "description": "Order lines of a fictitious bicycle manufacturer, sold online to consumers and through resellers. Contains no data about natural persons.",
+        "currency": "USD",
+        "from": "2010-12-29",
+        "to": "2014-01-28",
+        "scope": "*"
+    },
+    "dimensions": [
+        {
+            "name": "year",
+            "label": "Order year",
+            "description": "Calendar year of the order date.",
+            "type": "integer",
+            "values": [
+                2010,
+                2011,
+                2012,
+                2013,
+                2014
+            ]
+        },
+        {
+            "name": "quarter",
+            "label": "Order quarter",
+            "description": "Calendar quarter of the order date (1 to 4).",
+            "type": "integer",
+            "values": [
+                1,
+                2,
+                3,
+                4
+            ]
+        },
+        {
+            "name": "month",
+            "label": "Order month",
+            "description": "Calendar month of the order date (1 to 12).",
+            "type": "integer",
+            "values": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ]
+        },
+        {
+            "name": "channel",
+            "label": "Sales channel",
+            "description": "'Online' for direct sales to consumers, 'Reseller' for sales to bike shops and other companies.",
+            "type": "string",
+            "values": [
+                "Online",
+                "Reseller"
+            ]
+        },
+        {
+            "name": "productCategory",
+            "label": "Product category",
+            "description": "Top-level product category.",
+            "type": "string",
+            "values": [
+                "Accessories",
+                "Bikes",
+                "Clothing",
+                "Components"
+            ]
+        },
+        {
+            "name": "productSubcategory",
+            "label": "Product subcategory",
+            "description": "Product subcategory, e.g. 'Mountain Bikes'.",
+            "type": "string",
+            "values": [
+                "Bib-Shorts",
+                "Bike Racks",
+                "Bike Stands",
+                "Bottles and Cages",
+                "Bottom Brackets",
+                "Brakes",
+                "Caps",
+                "Chains",
+                "Cleaners",
+                "Cranksets",
+                "Derailleurs",
+                "Fenders",
+                "Forks",
+                "Gloves",
+                "Handlebars",
+                "Headsets",
+                "Helmets",
+                "Hydration Packs",
+                "Jerseys",
+                "Locks",
+                "Mountain Bikes",
+                "Mountain Frames",
+                "Pedals",
+                "Pumps",
+                "Road Bikes",
+                "Road Frames",
+                "Saddles",
+                "Shorts",
+                "Socks",
+                "Tights",
+                "Tires and Tubes",
+                "Touring Bikes",
+                "Touring Frames",
+                "Vests",
+                "Wheels"
+            ]
+        },
+        {
+            "name": "product",
+            "label": "Product",
+            "description": "Product name including size and colour variant.",
+            "type": "string",
+            "values": null
+        },
+        {
+            "name": "territoryGroup",
+            "label": "Territory group",
+            "description": "Sales territory group (continent level).",
+            "type": "string",
+            "values": [
+                "Europe",
+                "North America",
+                "Pacific"
+            ]
+        },
+        {
+            "name": "country",
+            "label": "Country",
+            "description": "Country of the sales territory.",
+            "type": "string",
+            "values": [
+                "Australia",
+                "Canada",
+                "France",
+                "Germany",
+                "United Kingdom",
+                "United States"
+            ]
+        },
+        {
+            "name": "region",
+            "label": "Region",
+            "description": "Sales territory region. The United States is split into five regions, every other country is one region.",
+            "type": "string",
+            "values": [
+                "Australia",
+                "Canada",
+                "Central",
+                "France",
+                "Germany",
+                "Northeast",
+                "Northwest",
+                "Southeast",
+                "Southwest",
+                "United Kingdom"
+            ]
+        },
+        {
+            "name": "reseller",
+            "label": "Reseller",
+            "description": "Name of the reseller company. Empty for online sales.",
+            "type": "string",
+            "values": null
+        },
+        {
+            "name": "resellerBusinessType",
+            "label": "Reseller business type",
+            "description": "Kind of reseller. Empty for online sales.",
+            "type": "string",
+            "values": [
+                "Specialty Bike Shop",
+                "Value Added Reseller",
+                "Warehouse"
+            ]
+        }
+    ],
+    "measures": [
+        {
+            "name": "revenue",
+            "label": "Revenue",
+            "description": "Sum of the sales amount.",
+            "unit": "USD"
+        },
+        {
+            "name": "cost",
+            "label": "Product cost",
+            "description": "Sum of the standard cost of the products sold.",
+            "unit": "USD"
+        },
+        {
+            "name": "margin",
+            "label": "Gross margin",
+            "description": "Revenue minus product cost.",
+            "unit": "USD"
+        },
+        {
+            "name": "quantity",
+            "label": "Units sold",
+            "description": "Number of units sold.",
+            "unit": null
+        },
+        {
+            "name": "orders",
+            "label": "Orders",
+            "description": "Number of distinct sales orders.",
+            "unit": null
+        }
+    ],
+    "limits": {
+        "maxGroupBy": 3,
+        "maxFilters": 10,
+        "defaultLimit": 100,
+        "maxLimit": 1000
+    }
+}

@@ -3,6 +3,7 @@
 #   docker compose --profile node up     -> NestJS + PostgreSQL 17, agent: Mastra
 # Both serve the same HTTP contract from the same AdventureWorksDW data, under the network name
 # data-api, and the agent under /agent in the same process. The app is on http://localhost:8080.
+# Without agent/.env, the agent talks to the demo model instead of an LLM (see agent/demo.env).
 #
 # The agent as a separate Mastra service in front of either backend:
 #   AGENT_URL=http://agent:4111 docker compose --profile node --profile agent up
@@ -55,8 +56,9 @@ services:
     environment:
       ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
       DATA_SCOPE: ${DATA_SCOPE:-*}
-    # MODEL and the provider's API key, see agent/.env.example.
+    # MODEL and the provider's API key, see agent/.env.example. Without agent/.env: the demo model.
     env_file:
+      - agent/demo.env
       - path: agent/.env
         required: false
     ports:
@@ -74,8 +76,9 @@ services:
     environment:
       DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
       DATA_SCOPE: ${DATA_SCOPE:-*}
-    # MODEL and the provider's API key, see agent/.env.example.
+    # MODEL and the provider's API key, see agent/.env.example. Without agent/.env: the demo model.
     env_file:
+      - agent/demo.env
       - path: agent/.env
         required: false
     ports:
@@ -90,14 +93,21 @@ services:
   agent:
     profiles: [agent]
     build: agent
-    # MODEL and the provider's API key, see agent/.env.example.
+    # MODEL and the provider's API key, see agent/.env.example. Without agent/.env: the demo model.
     env_file:
+      - agent/demo.env
       - path: agent/.env
         required: false
     environment:
       DATA_API_URL: http://data-api:8080
     ports:
       - 127.0.0.1:4111:4111
+
+  # A stand-in for an LLM provider, so the demo runs without an API key: no language model, only
+  # keyword matching, and every answer says so. See agent/demo.env.
+  demo-model:
+    profiles: [dotnet, node, agent]
+    build: demo-model
 
   web:
     profiles: [dotnet, node]

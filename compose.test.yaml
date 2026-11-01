@@ -1,5 +1,6 @@
 # The test setup: every agent talks to a fake LLM instead of a real provider (contract/fake-llm.mjs),
 # so the tests cost nothing and give the same answer every time. Real API keys are not used.
+# Two more backends talk to the demo model, as the demo does without agent/.env.
 #
 # Contract tests, both backends and the separate agent service:
 #   docker compose -f compose.yaml -f compose.test.yaml --profile dotnet --profile node --profile agent up -d --build
@@ -9,10 +10,13 @@ services:
   fake-llm:
     build:
       context: contract
+      additional_contexts:
+        demo-model: demo-model
       dockerfile_inline: |
         FROM node:24-alpine
-        COPY fake-llm.mjs /
-        CMD ["node", "/fake-llm.mjs"]
+        COPY --from=demo-model server.mjs /demo-model/
+        COPY fake-llm.mjs /contract/
+        CMD ["node", "/contract/fake-llm.mjs"]
     ports:
       - 127.0.0.1:${FAKE_LLM_PORT:-4000}:4000
 
@@ -78,3 +82,49 @@ services:
         condition: service_healthy
       fake-llm:
         condition: service_started
+
+  # Mastra with an OpenAI model: it uses OpenAI's Responses API, the .NET backend Chat Completions.
+  node-api-openai:
+    profiles: [node]
+    build: backends/node
+    environment:
+      DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
+      DATA_SCOPE: "*"
+      MODEL: openai/gpt-test
+      OPENAI_API_KEY: test-key
+      OPENAI_BASE_URL: http://fake-llm:4000/v1
+      DEBUG_TRAFFIC: "on"
+    ports:
+      - 127.0.0.1:8085:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fake-llm:
+        condition: service_started
+
+  # Both backends with the demo model, configured by agent/demo.env alone.
+  dotnet-api-demo:
+    profiles: [dotnet]
+    build: backends/dotnet
+    environment:
+      ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
+      DATA_SCOPE: "*"
+    env_file: agent/demo.env
+    ports:
+      - 127.0.0.1:8086:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  node-api-demo:
+    profiles: [node]
+    build: backends/node
+    environment:
+      DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
+      DATA_SCOPE: "*"
+    env_file: agent/demo.env
+    ports:
+      - 127.0.0.1:8087:8080
+    depends_on:
+      postgres:
+        condition: service_healthy

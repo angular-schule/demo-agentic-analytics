@@ -106,6 +106,9 @@ export class AgentController {
             aggregate: (request) => this.aggregator.aggregate(request),
             products: (search, limit) => searchProducts(this.drizzle, search, undefined, limit),
           }),
+          // OpenAI's Responses API, which Mastra uses for openai/ models, stores every response for at
+          // least 30 days unless the request says otherwise. The agent keeps no history at the provider.
+          defaultOptions: { providerOptions: { openai: { store: false } } },
         }),
       (error: unknown) => {
         this.analyst = undefined;
