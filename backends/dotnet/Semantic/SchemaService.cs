@@ -94,6 +94,11 @@ public sealed class SchemaService(IServiceScopeFactory scopes, DataScope scope)
             var numbers = await db.Sales.Select(numeric).Distinct().OrderBy(v => v).ToListAsync();
             return numbers.Cast<object>().ToList();
         }
+        if (dimension.Selector is Expression<Func<Sale, int?>> nullableNumeric)
+        {
+            var numbers = await db.Sales.Select(nullableNumeric).Where(v => v != null).Distinct().OrderBy(v => v).ToListAsync();
+            return numbers.OfType<object>().ToList();
+        }
 
         var text = (Expression<Func<Sale, string?>>)dimension.Selector;
         var strings = await db.Sales.Select(text).Where(v => v != null).Distinct().OrderBy(v => v).ToListAsync();

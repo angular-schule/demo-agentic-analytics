@@ -17,12 +17,12 @@ CREATE SCHEMA analytics;
 -- One row per order line of both sales channels. Amounts in USD.
 CREATE VIEW analytics.agent_view_sales WITH (security_barrier) AS
 WITH lines AS (
-  SELECT 'Online' AS channel, sales_order_number, order_date_key, product_key, sales_territory_key,
-         NULL::integer AS reseller_key, order_quantity, sales_amount, total_product_cost
+  SELECT 'Online' AS channel, sales_order_number, order_date_key, product_key, sales_territory_key, promotion_key,
+         NULL::integer AS reseller_key, order_quantity, sales_amount, total_product_cost, discount_amount, freight
   FROM dw.fact_internet_sales
   UNION ALL
-  SELECT 'Reseller', sales_order_number, order_date_key, product_key, sales_territory_key,
-         reseller_key, order_quantity, sales_amount, total_product_cost
+  SELECT 'Reseller', sales_order_number, order_date_key, product_key, sales_territory_key, promotion_key,
+         reseller_key, order_quantity, sales_amount, total_product_cost, discount_amount, freight
   FROM dw.fact_reseller_sales
 )
 SELECT l.channel,
@@ -35,21 +35,30 @@ SELECT l.channel,
        p.english_product_name AS product_name,
        ps.english_product_subcategory_name AS product_subcategory,
        pc.english_product_category_name AS product_category,
+       NULLIF(p.color, 'NA') AS product_color,
+       CASE trim(p.product_line) WHEN 'R' THEN 'Road' WHEN 'M' THEN 'Mountain' WHEN 'T' THEN 'Touring'
+                                 WHEN 'S' THEN 'Standard' END AS product_line,
+       pr.english_promotion_name AS promotion_name,
+       pr.english_promotion_type AS promotion_type,
        t.sales_territory_group,
        t.sales_territory_country,
        t.sales_territory_region,
        l.reseller_key,
        r.reseller_name,
        r.business_type AS reseller_business_type,
+       r.annual_revenue::integer AS reseller_annual_revenue,
        l.order_quantity,
        l.sales_amount,
-       l.total_product_cost
+       l.total_product_cost,
+       l.discount_amount::numeric(19,4) AS discount_amount,
+       l.freight
 FROM lines l
 JOIN dw.dim_date d ON d.date_key = l.order_date_key
 JOIN dw.dim_product p ON p.product_key = l.product_key
 JOIN dw.dim_product_subcategory ps ON ps.product_subcategory_key = p.product_subcategory_key
 JOIN dw.dim_product_category pc ON pc.product_category_key = ps.product_category_key
 JOIN dw.dim_sales_territory t ON t.sales_territory_key = l.sales_territory_key
+JOIN dw.dim_promotion pr ON pr.promotion_key = l.promotion_key
 LEFT JOIN dw.dim_reseller r ON r.reseller_key = l.reseller_key
 WHERE current_setting('analytics.territory_group', true) IN ('*', t.sales_territory_group);
 

@@ -26,7 +26,7 @@ public sealed record ToolError(string Error);
 
 /// <summary>
 /// The sales analyst, built with the Microsoft Agent Framework: the same system prompt and the same
-/// two tools as the Mastra agent, so the Angular app draws both alike. The tools call the semantic
+/// three backend tools as the Mastra agent, so the Angular app draws both alike. The tools call the semantic
 /// layer in this process; the model only sees what the views and the semantic layer let through.
 /// </summary>
 public static class AnalystAgent
@@ -90,10 +90,29 @@ public static class AnalystAgent
                 return new { products = await CatalogEndpoints.SearchProductsAsync(db, search, null, Math.Clamp(limit ?? 8, 1, 24), ct) };
             });
 
+        [Description("""
+            Looks up reseller companies by name and shows them to the user as cards: business type,
+            location, number of employees, annual revenue and the year the shop opened. Use it when the
+            user asks who a reseller is or where it is located. To get sales figures of resellers, use
+            querySales with the dimension "reseller".
+            """)]
+        async Task<object> FindResellers(
+            [Description("Part of the company name, e.g. \"Brakes and Gears\" or \"bike\".")] string search,
+            [Description("Only resellers in this country, e.g. \"Germany\".")] string? country = null,
+            [Description("Between 1 and 12. Default 6.")] int? limit = null,
+            CancellationToken ct = default) =>
+            await OrError(logger, async () =>
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AnalyticsContext>();
+                return new { resellers = await CatalogEndpoints.SearchResellersAsync(db, search, country, null, Math.Clamp(limit ?? 6, 1, 12), ct) };
+            });
+
         AITool[] tools =
         [
             AIFunctionFactory.Create(QuerySales, Tool("querySales")),
             AIFunctionFactory.Create(FindProducts, Tool("findProducts")),
+            AIFunctionFactory.Create(FindResellers, Tool("findResellers")),
         ];
         return model.AsAIAgent(name: Id, instructions: Instructions(schema), tools: tools);
     }
@@ -227,6 +246,8 @@ public static class AnalystAgent
               available to you and offer an analysis at company, product or region level instead.
             - Reseller names are company names and may be shown.
             - The first and last year are incomplete; say so when you compare years.
+            - If the user asks what you can do, suggest a few concrete questions that the dimensions and
+              measures above can answer, and mention that you can show products and look up resellers.
             - If a tool returns an error, correct the request and try again.
             - Keep answers short: the visualization speaks for itself.
             """;

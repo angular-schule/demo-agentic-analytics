@@ -4,14 +4,20 @@
 //
 // Words for measures and dimensions -> querySales with groupBy, values from the data -> filters,
 // "top 10" -> limit and order, "trend" -> per year, a product model or "look like" -> findProducts,
-// "pin" -> pinToDashboard with the last view, people -> a refusal. Anything it does not understand
-// gets an honest "I can't answer that" and revenue per year instead.
+// "who is <company>" -> findResellers, "pin" -> pinToDashboard with the last view, "what can you do"
+// -> example questions, people -> a refusal. Anything it does not understand gets an honest
+// "I can't answer that" and revenue per year instead.
 import { serve } from './server.mjs';
 
 const NOTE = 'Demo mode, no real LLM:';
 
 /** Keywords per dimension, English and German. The more specific phrases come first. */
 const DIMENSION_WORDS = {
+  resellerAnnualRevenue: ['reseller annual revenue', 'annual revenue', 'larger resellers', 'bigger resellers', 'smaller resellers', 'shop size', 'jahresumsatz', 'größere händler', 'kleinere händler'],
+  promotionType: ['promotion type', 'type of promotion', 'aktionsart', 'art der aktion'],
+  promotion: ['promotion', 'aktion'],
+  productLine: ['product line', 'produktlinie'],
+  color: ['colour', 'color', 'farbe'],
   resellerBusinessType: ['business type', 'geschäftstyp', 'geschäftsart'],
   productSubcategory: ['product subcategor', 'subcategor', 'unterkategorie'],
   productCategory: ['product categor', 'categor', 'kategorie'],
@@ -29,6 +35,9 @@ const TIME = ['year', 'quarter', 'month'];
 const TREND = ['trend', 'develop', 'over time', 'entwick', 'verlauf', 'zeitlich'];
 
 const MEASURE_WORDS = {
+  averageOrderValue: ['average order value', 'order value', 'bigger orders', 'larger orders', 'auftragswert', 'bestellwert', 'größere aufträge'],
+  discount: ['discount', 'rabatt', 'nachlass'],
+  freight: ['freight', 'shipping', 'fracht', 'versand'],
   margin: ['gross margin', 'margin', 'profit', 'marge', 'gewinn', 'rohertrag'],
   cost: ['cost', 'kosten'],
   quantity: ['units sold', 'units', 'quantity', 'how many', 'stück', 'menge', 'anzahl'],
@@ -40,6 +49,9 @@ const PEOPLE = ['manager', 'employee', 'salesperson', 'sales rep', 'representati
 const PIN = ['pin', 'dashboard', 'anpinnen', 'merken'];
 const LOOKS = ['look like', 'looks like', 'photo', 'picture', 'image', 'variant', 'aussehen', 'aussieht', 'foto', 'bild', 'show me the', 'zeig mir die'];
 const PRODUCT_WORDS = ['helmet', 'jersey', 'glove', 'bottle', 'tire', 'tube', 'shorts', 'sock', 'cap', 'vest', 'light', 'lock', 'pump', 'rack', 'saddle', 'pedal', 'frame', 'wheel', 'fender', 'cage', 'stand', 'bike'];
+const CAPABILITIES = ['what can you do', 'what can i ask', 'what do you know', 'help me', 'was kannst du', 'was kann ich fragen', 'wobei kannst du'];
+/** "Who is Brakes and Gears, and where are they?" -> "Brakes and Gears". */
+const RESELLER_LOOKUP = /(?:who is|who are|tell me about|where is|wer ist|erzähl mir (?:etwas )?über)\s+(?:the reseller\s+|der händler\s+)?([^,?.!]+?)\s*(?:,|\?|\.|!|$|\band where\b|\bund wo\b)/i;
 const MOST = ['top', 'most', 'biggest', 'largest', 'best', 'highest', 'meiste', 'größte', 'beste', 'höchste'];
 const LEAST = ['least', 'lowest', 'smallest', 'worst', 'wenigste', 'kleinste', 'schlechteste', 'niedrigste'];
 
@@ -72,20 +84,22 @@ export function readSchema(system) {
   return { dimensions, measures };
 }
 
-/** Finds keywords in order of appearance; each match blanks its words, so "sales channel" is not also "sales". */
+/**
+ * Finds keywords in order of appearance. Each match blanks its words, so "sales channel" is not also
+ * "sales", and every keyword of a name is blanked, so "larger resellers" is not also "reseller".
+ */
 function take(state, wordsByName) {
-  const found = [];
+  const found = new Map();
   for (const [name, words] of Object.entries(wordsByName)) {
     for (const word of words) {
       const at = wordAt(state.text, word);
       if (at < 0) continue;
-      found.push({ name, at });
+      found.set(name, Math.min(found.get(name) ?? at, at));
       const end = state.text.slice(at).search(/[^\p{L}\d-]|$/u);
       state.text = state.text.slice(0, at) + ' '.repeat(Math.max(end, word.length)) + state.text.slice(at + Math.max(end, word.length));
-      break;
     }
   }
-  return found.sort((a, b) => a.at - b.at).map((f) => f.name);
+  return [...found].sort((a, b) => a[1] - b[1]).map(([name]) => name);
 }
 
 /** Values of the data that appear in the question: the longest first, so "Mountain Bikes" wins over "Bikes". */
@@ -161,6 +175,7 @@ function afterTool(name, output) {
     result = null;
   }
   if (result?.error) return `The backend rejected the request: ${result.error} A real model would correct it; I can only match keywords, so please try other words.`;
+  if (name === 'findResellers') return result?.resellers?.length ? 'These are the matching resellers. They are companies, so their names may be shown.' : 'No reseller has that name.';
   if (name === 'findProducts') return result?.products?.length ? 'These are the matching products from the catalogue.' : 'The catalogue has no product with that name.';
   if (name === 'pinToDashboard') return 'The view is on the dashboard now. It asks the backend directly, without any model.';
   return 'The numbers come straight from the database. A real model would now comment on what stands out; I cannot read them.';
@@ -177,6 +192,13 @@ export function demoAnswer({ system, tools, messages }) {
   if (has(lower, PEOPLE)) {
     return { text: `${NOTE} I recognised a question about people. Personal data such as sales representatives, key account managers or contact persons is deliberately not part of the data model. I can show figures per reseller, product or region instead.` };
   }
+  if (has(lower, CAPABILITIES)) {
+    const measures = list(schema.measures.map(humanize));
+    const dimensions = list(schema.dimensions.map((d) => humanize(d.name)));
+    return {
+      text: `${NOTE} I only match keywords to the semantic layer in my prompt. I can show ${measures}, grouped or filtered by ${dimensions}. Try for example "revenue per quarter and channel", "top 10 resellers in Germany", "discount per promotion type", "show me the Mountain-200 bikes" or "who is Brakes and Gears?". A real model would suggest questions from the same list.`,
+    };
+  }
   if (has(lower, PIN) && tools.includes('pinToDashboard')) {
     const view = messages.flatMap((m) => (m.role === 'assistant' ? m.toolCalls : [])).filter((c) => c.name === 'querySales').at(-1)?.input;
     if (!view) return { text: `${NOTE} There is no chart in this chat yet that I could pin. Ask for one first, e.g. "revenue per year".` };
@@ -185,6 +207,10 @@ export function demoAnswer({ system, tools, messages }) {
   const search = productSearch(question);
   if (search && tools.includes('findProducts')) {
     return { text: `${NOTE} I search the catalogue for "${search}".`, tool: 'findProducts', input: { search, limit: 8 } };
+  }
+  const company = question.match(RESELLER_LOOKUP)?.[1];
+  if (company && tools.includes('findResellers')) {
+    return { text: `${NOTE} I look up the reseller "${company}".`, tool: 'findResellers', input: { search: company, limit: 6 } };
   }
   const view = viewFor(question, schema);
   if (view && tools.includes('querySales')) return { text: `${NOTE} ${describe(view)}`, tool: 'querySales', input: view };

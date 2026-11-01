@@ -7,12 +7,13 @@ import { createInstructions } from '../agent/src/instructions.ts';
 import { demoAnswer, readSchema } from './demo.mjs';
 
 const system = createInstructions(JSON.parse(readFileSync(new URL('./schema.test.json', import.meta.url), 'utf8')));
-const tools = ['querySales', 'findProducts', 'pinToDashboard'];
+const tools = ['querySales', 'findProducts', 'findResellers', 'pinToDashboard'];
 const ask = (text, messages = []) => demoAnswer({ system, tools, messages: [...messages, { role: 'user', text }] });
 
 test('reads measures, dimensions and their values from the system prompt', () => {
   const schema = readSchema(system);
-  assert.deepEqual(schema.measures, ['revenue', 'cost', 'margin', 'quantity', 'orders']);
+  assert.deepEqual(schema.measures, ['revenue', 'cost', 'margin', 'quantity', 'orders', 'averageOrderValue', 'discount', 'freight']);
+  assert.deepEqual(schema.dimensions.find((d) => d.name === 'resellerAnnualRevenue')?.values, [30000, 80000, 100000, 150000, 300000]);
   assert.ok(schema.dimensions.find((d) => d.name === 'country')?.values.includes('Germany'));
   assert.deepEqual(schema.dimensions.find((d) => d.name === 'product')?.values, []);
 });
@@ -52,6 +53,26 @@ test('the example questions of the app', () => {
     tool: 'findProducts',
     input: { search: 'Mountain-200', limit: 8 },
   });
+
+  assert.deepEqual(ask('How much discount did each promotion type grant, and how much revenue came with it?').input.query, {
+    measures: ['discount', 'revenue'],
+    groupBy: ['promotionType'],
+  });
+
+  assert.deepEqual(ask('Do larger resellers place bigger orders? Show the average order value per reseller annual revenue.').input.query, {
+    measures: ['averageOrderValue'],
+    groupBy: ['resellerAnnualRevenue'],
+  });
+
+  assert.deepEqual(ask('Who is Brakes and Gears, and where are they located?'), {
+    text: 'Demo mode, no real LLM: I look up the reseller "Brakes and Gears".',
+    tool: 'findResellers',
+    input: { search: 'Brakes and Gears', limit: 6 },
+  });
+
+  const capabilities = ask('What can you do for me?');
+  assert.equal(capabilities.tool, undefined);
+  assert.match(capabilities.text, /average order value/);
 
   const people = ask('Who is the key account manager of our biggest reseller?');
   assert.equal(people.tool, undefined);

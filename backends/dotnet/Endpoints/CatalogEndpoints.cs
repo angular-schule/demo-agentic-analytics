@@ -36,6 +36,29 @@ public static class CatalogEndpoints
             .ToListAsync(ct);
     }
 
+    /// <summary>Resellers by part of the name, country and business type, for GET /api/resellers and the agent's tool findResellers.</summary>
+    public static Task<List<ResellerSummary>> SearchResellersAsync(AnalyticsContext db, string? search, string? country, string? businessType, int limit, CancellationToken ct)
+    {
+        var query = db.Resellers.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(r => r.ResellerName.Contains(search));
+        }
+        if (!string.IsNullOrWhiteSpace(country))
+        {
+            query = query.Where(r => r.Country == country);
+        }
+        if (!string.IsNullOrWhiteSpace(businessType))
+        {
+            query = query.Where(r => r.BusinessType == businessType);
+        }
+        return query
+            .OrderBy(r => r.ResellerName).ThenBy(r => r.ResellerKey)
+            .Take(Math.Clamp(limit, 1, MaxLimit))
+            .Select(r => new ResellerSummary(r.ResellerKey, r.ResellerName, r.BusinessType, r.City, r.StateProvinceName, r.Country, r.NumberEmployees, r.AnnualRevenue, r.YearOpened))
+            .ToListAsync(ct);
+    }
+
     public static void MapCatalogEndpoints(this RouteGroupBuilder api)
     {
         api.MapGet("/products", (AnalyticsContext db, string? search, string? category, int? limit, CancellationToken ct) =>
@@ -67,26 +90,7 @@ public static class CatalogEndpoints
             })
             .Produces(StatusCodes.Status404NotFound);
 
-        api.MapGet("/resellers", async (AnalyticsContext db, string? search, string? country, string? businessType, int? limit, CancellationToken ct) =>
-        {
-            var query = db.Resellers.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                query = query.Where(r => r.ResellerName.Contains(search));
-            }
-            if (!string.IsNullOrWhiteSpace(country))
-            {
-                query = query.Where(r => r.Country == country);
-            }
-            if (!string.IsNullOrWhiteSpace(businessType))
-            {
-                query = query.Where(r => r.BusinessType == businessType);
-            }
-            return await query
-                .OrderBy(r => r.ResellerName).ThenBy(r => r.ResellerKey)
-                .Take(Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit))
-                .Select(r => new ResellerSummary(r.ResellerKey, r.ResellerName, r.BusinessType, r.City, r.StateProvinceName, r.Country, r.NumberEmployees, r.AnnualRevenue, r.YearOpened))
-                .ToListAsync(ct);
-        });
+        api.MapGet("/resellers", (AnalyticsContext db, string? search, string? country, string? businessType, int? limit, CancellationToken ct) =>
+            SearchResellersAsync(db, search, country, businessType, limit ?? DefaultLimit, ct));
     }
 }

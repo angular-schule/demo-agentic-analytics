@@ -6,7 +6,7 @@ import { BadRequestException, Body, Controller, Get, NotFoundException, Post, Re
 import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
-import { searchProducts } from '../catalog/catalog.controller';
+import { searchProducts, searchResellers } from '../catalog/catalog.controller';
 import { DrizzleService } from '../db/drizzle.service';
 import { EnvironmentVariables } from '../env.config';
 import { SalesAggregatorService } from '../semantic/sales-aggregator.service';
@@ -105,6 +105,7 @@ export class AgentController {
           tools: createTools(schema, {
             aggregate: (request) => this.aggregator.aggregate(request),
             products: (search, limit) => searchProducts(this.drizzle, search, undefined, limit),
+            resellers: (search, country, limit) => searchResellers(this.drizzle, search, country, undefined, limit),
           }),
           // OpenAI's Responses API, which Mastra uses for openai/ models, stores every response for at
           // least 30 days unless the request says otherwise. The agent keeps no history at the provider.

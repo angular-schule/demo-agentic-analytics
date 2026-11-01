@@ -126,6 +126,34 @@
             "values": null
         },
         {
+            "name": "color",
+            "label": "Colour",
+            "description": "Colour of the product. Empty for products without a colour.",
+            "type": "string",
+            "values": [
+                "Black",
+                "Blue",
+                "Multi",
+                "Red",
+                "Silver",
+                "Silver/Black",
+                "White",
+                "Yellow"
+            ]
+        },
+        {
+            "name": "productLine",
+            "label": "Product line",
+            "description": "Product line. Empty for parts that belong to no line.",
+            "type": "string",
+            "values": [
+                "Mountain",
+                "Road",
+                "Standard",
+                "Touring"
+            ]
+        },
+        {
             "name": "territoryGroup",
             "label": "Territory group",
             "description": "Sales territory group (continent level).",
@@ -185,6 +213,53 @@
                 "Value Added Reseller",
                 "Warehouse"
             ]
+        },
+        {
+            "name": "resellerAnnualRevenue",
+            "label": "Reseller annual revenue",
+            "description": "Annual revenue class of the reseller company in USD, a measure of its size. Empty for online sales.",
+            "type": "integer",
+            "values": [
+                30000,
+                80000,
+                100000,
+                150000,
+                300000
+            ]
+        },
+        {
+            "name": "promotion",
+            "label": "Promotion",
+            "description": "Promotion the order line was sold under, e.g. 'Volume Discount 11 to 14'. 'No Discount' when there was none.",
+            "type": "string",
+            "values": [
+                "Mountain-100 Clearance Sale",
+                "Mountain-500 Silver Clearance Sale",
+                "No Discount",
+                "Road-650 Overstock",
+                "Sport Helmet Discount-2002",
+                "Sport Helmet Discount-2003",
+                "Touring-1000 Promotion",
+                "Touring-3000 Promotion",
+                "Volume Discount 11 to 14",
+                "Volume Discount 15 to 24",
+                "Volume Discount 25 to 40",
+                "Volume Discount 41 to 60"
+            ]
+        },
+        {
+            "name": "promotionType",
+            "label": "Promotion type",
+            "description": "Kind of promotion, e.g. a volume discount or the clearance of a discontinued product.",
+            "type": "string",
+            "values": [
+                "Discontinued Product",
+                "Excess Inventory",
+                "New Product",
+                "No Discount",
+                "Seasonal Discount",
+                "Volume Discount"
+            ]
         }
     ],
     "measures": [
@@ -217,6 +292,24 @@
             "label": "Orders",
             "description": "Number of distinct sales orders.",
             "unit": null
+        },
+        {
+            "name": "averageOrderValue",
+            "label": "Average order value",
+            "description": "Revenue per distinct sales order.",
+            "unit": "USD"
+        },
+        {
+            "name": "discount",
+            "label": "Discount",
+            "description": "Sum of the discounts granted by promotions. Only reseller sales have discounts.",
+            "unit": "USD"
+        },
+        {
+            "name": "freight",
+            "label": "Freight",
+            "description": "Sum of the freight charged on the orders.",
+            "unit": "USD"
         }
     ],
     "limits": {

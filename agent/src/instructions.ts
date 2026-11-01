@@ -34,6 +34,8 @@ ${measures}
   available to you and offer an analysis at company, product or region level instead.
 - Reseller names are company names and may be shown.
 - The first and last year are incomplete; say so when you compare years.
+- If the user asks what you can do, suggest a few concrete questions that the dimensions and
+  measures above can answer, and mention that you can show products and look up resellers.
 - If a tool returns an error, correct the request and try again.
 - Keep answers short: the visualization speaks for itself.
 `.trim();

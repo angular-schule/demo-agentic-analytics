@@ -49,6 +49,33 @@ describe('semantic layer', () => {
     assert.deepEqual(payload.rows, [{ revenue: 109809274.2, cost: 97257907.95, margin: 12551366.25, quantity: 274776, orders: 31455 }]);
   });
 
+  test('every measure at once', async () => {
+    const { payload } = await same('/api/schema');
+    const { payload: total } = await aggregate({ measures: payload.measures.map((m) => m.name) });
+    assert.equal(total.rows[0].discount, 527507.93);
+    assert.equal(total.rows[0].freight, 2745235.52);
+  });
+
+  test('discount per promotion type: only promotions grant one', async () => {
+    const { payload } = await aggregate({ measures: ['discount', 'revenue'], groupBy: ['promotionType'] });
+    assert.equal(payload.rows.find((r) => r.promotionType === 'No Discount').discount, 0);
+    assert.ok(payload.rows.find((r) => r.promotionType === 'Volume Discount').discount > 0);
+  });
+
+  test('a nullable numeric dimension groups and filters: average order value per reseller size', async () => {
+    const { payload } = await aggregate({
+      measures: ['averageOrderValue', 'orders'],
+      groupBy: ['resellerAnnualRevenue'],
+      filters: [{ dimension: 'resellerAnnualRevenue', operator: 'gte', values: [100000] }],
+    });
+    assert.deepEqual(payload.rows.map((r) => r.resellerAnnualRevenue).sort((a, b) => a - b), [100000, 150000, 300000]);
+  });
+
+  test('average order value is rounded alike for every product', () =>
+    aggregate({ measures: ['averageOrderValue'], groupBy: ['product'], limit: 1000 }));
+
+  test('colour and product line', () => aggregate({ measures: ['revenue', 'freight'], groupBy: ['productLine', 'color'] }));
+
   test('revenue per channel', async () => {
     const { payload } = await aggregate({ measures: ['revenue'], groupBy: ['channel'] });
     assert.deepEqual(payload.rows, [

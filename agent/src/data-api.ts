@@ -47,6 +47,18 @@ export interface ProductSummary {
   hasPhoto: boolean;
 }
 
+export interface ResellerSummary {
+  resellerKey: number;
+  resellerName: string;
+  businessType: string;
+  city: string | null;
+  stateProvince: string | null;
+  country: string | null;
+  numberEmployees: number | null;
+  annualRevenue: number | null;
+  yearOpened: number | null;
+}
+
 /**
  * A request the backend rejected. The message is the problem detail, which names the allowed
  * values, so the model can correct its next call.
@@ -74,4 +86,6 @@ export const dataApi = {
     call<AggregateResponse>('/api/sales/aggregate', { method: 'POST', body: JSON.stringify(request) }),
   products: (search: string, limit: number) =>
     call<ProductSummary[]>(`/api/products?${new URLSearchParams({ search, limit: String(limit) })}`),
+  resellers: (search: string, country: string | undefined, limit: number) =>
+    call<ResellerSummary[]>(`/api/resellers?${new URLSearchParams({ search, ...(country ? { country } : {}), limit: String(limit) })}`),
 };

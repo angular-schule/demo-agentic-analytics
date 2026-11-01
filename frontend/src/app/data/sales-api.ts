@@ -34,6 +34,18 @@ export interface ProductSummary {
   hasPhoto: boolean;
 }
 
+export interface ResellerSummary {
+  resellerKey: number;
+  resellerName: string;
+  businessType: string;
+  city: string | null;
+  stateProvince: string | null;
+  country: string | null;
+  numberEmployees: number | null;
+  annualRevenue: number | null;
+  yearOpened: number | null;
+}
+
 export interface DataBackendHealth {
   backend: 'dotnet' | 'node';
   database: string;

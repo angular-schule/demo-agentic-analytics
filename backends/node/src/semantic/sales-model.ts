@@ -37,11 +37,16 @@ export const DIMENSIONS: readonly DimensionDefinition[] = [
   { name: 'productCategory', label: 'Product category', description: 'Top-level product category.', isNumeric: false, isTime: false, listValues: true, column: sales.productCategory },
   { name: 'productSubcategory', label: 'Product subcategory', description: "Product subcategory, e.g. 'Mountain Bikes'.", isNumeric: false, isTime: false, listValues: true, column: sales.productSubcategory },
   { name: 'product', label: 'Product', description: 'Product name including size and colour variant.', isNumeric: false, isTime: false, listValues: false, column: sales.productName },
+  { name: 'color', label: 'Colour', description: 'Colour of the product. Empty for products without a colour.', isNumeric: false, isTime: false, listValues: true, column: sales.productColor },
+  { name: 'productLine', label: 'Product line', description: 'Product line. Empty for parts that belong to no line.', isNumeric: false, isTime: false, listValues: true, column: sales.productLine },
   { name: 'territoryGroup', label: 'Territory group', description: 'Sales territory group (continent level).', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryGroup },
   { name: 'country', label: 'Country', description: 'Country of the sales territory.', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryCountry },
   { name: 'region', label: 'Region', description: 'Sales territory region. The United States is split into five regions, every other country is one region.', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryRegion },
   { name: 'reseller', label: 'Reseller', description: 'Name of the reseller company. Empty for online sales.', isNumeric: false, isTime: false, listValues: false, column: sales.resellerName },
   { name: 'resellerBusinessType', label: 'Reseller business type', description: 'Kind of reseller. Empty for online sales.', isNumeric: false, isTime: false, listValues: true, column: sales.resellerBusinessType },
+  { name: 'resellerAnnualRevenue', label: 'Reseller annual revenue', description: 'Annual revenue class of the reseller company in USD, a measure of its size. Empty for online sales.', isNumeric: true, isTime: false, listValues: true, column: sales.resellerAnnualRevenue },
+  { name: 'promotion', label: 'Promotion', description: "Promotion the order line was sold under, e.g. 'Volume Discount 11 to 14'. 'No Discount' when there was none.", isNumeric: false, isTime: false, listValues: true, column: sales.promotionName },
+  { name: 'promotionType', label: 'Promotion type', description: 'Kind of promotion, e.g. a volume discount or the clearance of a discontinued product.', isNumeric: false, isTime: false, listValues: true, column: sales.promotionType },
 ];
 
 export const MEASURES: readonly MeasureDefinition[] = [
@@ -64,6 +69,18 @@ export const MEASURES: readonly MeasureDefinition[] = [
   {
     name: 'orders', label: 'Orders', description: 'Number of distinct sales orders.', unit: null,
     sql: countDistinct(sales.salesOrderNumber),
+  },
+  {
+    name: 'averageOrderValue', label: 'Average order value', description: 'Revenue per distinct sales order.', unit: 'USD',
+    sql: sql<number>`round(coalesce(sum(${sales.salesAmount}) / nullif(count(distinct ${sales.salesOrderNumber}), 0), 0), 2)`.mapWith(Number),
+  },
+  {
+    name: 'discount', label: 'Discount', description: 'Sum of the discounts granted by promotions. Only reseller sales have discounts.', unit: 'USD',
+    sql: sql<number>`round(coalesce(sum(${sales.discountAmount}), 0), 2)`.mapWith(Number),
+  },
+  {
+    name: 'freight', label: 'Freight', description: 'Sum of the freight charged on the orders.', unit: 'USD',
+    sql: sql<number>`round(coalesce(sum(${sales.freight}), 0), 2)`.mapWith(Number),
   },
 ];
 

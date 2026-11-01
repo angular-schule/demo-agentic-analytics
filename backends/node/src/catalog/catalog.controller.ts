@@ -69,6 +69,37 @@ export function searchProducts(drizzle: DrizzleService, search: string | undefin
     .limit(limit);
 }
 
+/** Resellers by part of the name, country and business type, for GET /api/resellers and the agent's tool findResellers. */
+export function searchResellers(
+  drizzle: DrizzleService,
+  search: string | undefined,
+  country: string | undefined,
+  businessType: string | undefined,
+  limit: number,
+): Promise<ResellerSummary[]> {
+  const conditions: SQL[] = [];
+  if (search?.trim()) conditions.push(ilike(resellers.resellerName, containsPattern(search)));
+  if (country?.trim()) conditions.push(eq(resellers.country, country));
+  if (businessType?.trim()) conditions.push(eq(resellers.businessType, businessType));
+
+  return drizzle.db
+    .select({
+      resellerKey: resellers.resellerKey,
+      resellerName: resellers.resellerName,
+      businessType: resellers.businessType,
+      city: resellers.city,
+      stateProvince: resellers.stateProvinceName,
+      country: resellers.country,
+      numberEmployees: resellers.numberEmployees,
+      annualRevenue: resellers.annualRevenue,
+      yearOpened: resellers.yearOpened,
+    })
+    .from(resellers)
+    .where(and(...conditions))
+    .orderBy(asc(resellers.resellerName), asc(resellers.resellerKey))
+    .limit(limit);
+}
+
 /** Product catalogue and reseller directory: plain lookups next to the aggregations. */
 @ApiTags('catalog')
 @Controller('api')
@@ -127,27 +158,7 @@ export class CatalogController {
     @Query('businessType') businessType?: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<ResellerSummary[]> {
-    const conditions: SQL[] = [];
-    if (search?.trim()) conditions.push(ilike(resellers.resellerName, containsPattern(search)));
-    if (country?.trim()) conditions.push(eq(resellers.country, country));
-    if (businessType?.trim()) conditions.push(eq(resellers.businessType, businessType));
-
-    return this.drizzle.db
-      .select({
-        resellerKey: resellers.resellerKey,
-        resellerName: resellers.resellerName,
-        businessType: resellers.businessType,
-        city: resellers.city,
-        stateProvince: resellers.stateProvinceName,
-        country: resellers.country,
-        numberEmployees: resellers.numberEmployees,
-        annualRevenue: resellers.annualRevenue,
-        yearOpened: resellers.yearOpened,
-      })
-      .from(resellers)
-      .where(and(...conditions))
-      .orderBy(asc(resellers.resellerName), asc(resellers.resellerKey))
-      .limit(clampLimit(limit));
+    return searchResellers(this.drizzle, search, country, businessType, clampLimit(limit));
   }
 }
 

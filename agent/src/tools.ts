@@ -73,7 +73,23 @@ export function createTools(schema: SalesSchema) {
     execute: ({ search, limit }) => orError(async () => ({ products: await dataApi.products(search, limit ?? 8) })),
   });
 
-  return { querySales, findProducts };
+  const findResellers = createTool({
+    id: 'findResellers',
+    description: `
+      Looks up reseller companies by name and shows them to the user as cards: business type,
+      location, number of employees, annual revenue and the year the shop opened. Use it when the
+      user asks who a reseller is or where it is located. To get sales figures of resellers, use
+      querySales with the dimension "reseller".
+    `,
+    inputSchema: z.object({
+      search: z.string().min(2).describe('Part of the company name, e.g. "Brakes and Gears" or "bike".'),
+      country: z.string().optional().describe('Only resellers in this country, e.g. "Germany".'),
+      limit: z.number().int().min(1).max(12).optional().describe('Between 1 and 12. Default 6.'),
+    }),
+    execute: ({ search, country, limit }) => orError(async () => ({ resellers: await dataApi.resellers(search, country, limit ?? 6) })),
+  });
+
+  return { querySales, findProducts, findResellers };
 }
 
 /**

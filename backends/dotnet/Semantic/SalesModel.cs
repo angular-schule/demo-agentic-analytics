@@ -39,11 +39,17 @@ public static class SalesModel
         Text("productCategory", "Product category", "Top-level product category.", s => s.ProductCategory, listValues: true),
         Text("productSubcategory", "Product subcategory", "Product subcategory, e.g. 'Mountain Bikes'.", s => s.ProductSubcategory, listValues: true),
         Text("product", "Product", "Product name including size and colour variant.", s => s.ProductName, listValues: false),
+        Text("color", "Colour", "Colour of the product. Empty for products without a colour.", s => s.ProductColor, listValues: true),
+        Text("productLine", "Product line", "Product line. Empty for parts that belong to no line.", s => s.ProductLine, listValues: true),
         Text("territoryGroup", "Territory group", "Sales territory group (continent level).", s => s.SalesTerritoryGroup, listValues: true),
         Text("country", "Country", "Country of the sales territory.", s => s.SalesTerritoryCountry, listValues: true),
         Text("region", "Region", "Sales territory region. The United States is split into five regions, every other country is one region.", s => s.SalesTerritoryRegion, listValues: true),
         Text("reseller", "Reseller", "Name of the reseller company. Empty for online sales.", s => s.ResellerName, listValues: false),
         Text("resellerBusinessType", "Reseller business type", "Kind of reseller. Empty for online sales.", s => s.ResellerBusinessType, listValues: true),
+        new("resellerAnnualRevenue", "Reseller annual revenue", "Annual revenue class of the reseller company in USD, a measure of its size. Empty for online sales.",
+            IsNumeric: true, IsTime: false, ListValues: true, (Expression<Func<Sale, int?>>)(s => s.ResellerAnnualRevenue)),
+        Text("promotion", "Promotion", "Promotion the order line was sold under, e.g. 'Volume Discount 11 to 14'. 'No Discount' when there was none.", s => s.PromotionName, listValues: true),
+        Text("promotionType", "Promotion type", "Kind of promotion, e.g. a volume discount or the clearance of a discontinued product.", s => s.PromotionType, listValues: true),
     ];
 
     public static readonly IReadOnlyList<MeasureDefinition> Measures =
@@ -58,6 +64,12 @@ public static class SalesModel
             g => g.Sum(s => (int?)s.OrderQuantity) ?? 0),
         new("orders", "Orders", "Number of distinct sales orders.", null,
             g => g.Select(s => s.SalesOrderNumber).Distinct().Count()),
+        new("averageOrderValue", "Average order value", "Revenue per distinct sales order.", "USD",
+            g => Math.Round((g.Sum(s => s.SalesAmount) ?? 0m) / g.Select(s => s.SalesOrderNumber).Distinct().Count(), 2)),
+        new("discount", "Discount", "Sum of the discounts granted by promotions. Only reseller sales have discounts.", "USD",
+            g => Math.Round(g.Sum(s => s.DiscountAmount) ?? 0m, 2)),
+        new("freight", "Freight", "Sum of the freight charged on the orders.", "USD",
+            g => Math.Round(g.Sum(s => s.Freight) ?? 0m, 2)),
     ];
 
     public static DimensionDefinition? FindDimension(string name) =>

@@ -13,15 +13,22 @@ public sealed class Sale
     public required string ProductName { get; init; }
     public required string ProductSubcategory { get; init; }
     public required string ProductCategory { get; init; }
+    public string? ProductColor { get; init; }
+    public string? ProductLine { get; init; }
+    public required string PromotionName { get; init; }
+    public required string PromotionType { get; init; }
     public string? SalesTerritoryGroup { get; init; }
     public required string SalesTerritoryCountry { get; init; }
     public required string SalesTerritoryRegion { get; init; }
     public int? ResellerKey { get; init; }
     public string? ResellerName { get; init; }
     public string? ResellerBusinessType { get; init; }
+    public int? ResellerAnnualRevenue { get; init; }
     public short? OrderQuantity { get; init; }
     public decimal? SalesAmount { get; init; }
     public decimal? TotalProductCost { get; init; }
+    public decimal? DiscountAmount { get; init; }
+    public decimal? Freight { get; init; }
 }
 
 /// <summary>A reseller (a company) from analytics.AgentViewResellers.</summary>

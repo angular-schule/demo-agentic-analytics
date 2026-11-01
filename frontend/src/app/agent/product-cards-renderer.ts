@@ -43,7 +43,7 @@ type FindProductsArgs = z.infer<typeof findProductsSchema>;
       <p class="empty">Searching products for “{{ toolCall().args.search }}” …</p>
     }
   `,
-  styleUrl: './product-cards-renderer.css',
+  styleUrls: ['./cards.css', './product-cards-renderer.css'],
 })
 export class ProductCardsRenderer implements ToolRenderer<FindProductsArgs> {
   readonly toolCall = input.required<AngularToolCall<FindProductsArgs>>();

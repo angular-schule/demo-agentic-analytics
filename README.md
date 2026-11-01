@@ -10,13 +10,14 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 
 ## What it shows
 
-- **Generative UI with Angular and CopilotKit.** The agent's tool calls are rendered as Angular components: line, bar and stat charts, tables, and product cards with photos.
+- **Generative UI with Angular and CopilotKit.** The agent's tool calls are rendered as Angular components: line, bar and stat charts, tables, product cards with photos, and reseller cards.
 - **AG-UI** as the protocol between the Angular app and the agent, streamed as server-sent events.
-- **The same agent, built twice:** with Mastra (TypeScript) and with the Microsoft Agent Framework (C#). Same system prompt, same two tools, and the tool schemas are generated from the semantic layer, so the model only knows names that exist. The Angular app draws both alike.
+- **The same agent, built twice:** with Mastra (TypeScript) and with the Microsoft Agent Framework (C#). Same system prompt, same three backend tools, and the tool schemas are generated from the semantic layer, so the model only knows names that exist. The Angular app draws both alike.
 - **The agent in the backend or as a separate service.** By default it runs in the backend's process: Mastra inside NestJS, the Microsoft Agent Framework inside ASP.NET Core. A separate Mastra service in front of either backend is one profile away.
 - **A semantic layer instead of SQL.** The model chooses measures, dimensions and filters. It never writes SQL; the backends validate every request and pass values as parameters.
-- **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
+- **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The classic AdventureWorks analysis of bike buyers by age, income and commute distance is left out on purpose, because it is about private persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
 - **Two interchangeable backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
+- **Many questions, few tools.** Revenue, cost, margin, units, orders, average order value, discounts and freight, by time, channel, product, colour, product line, territory, reseller, reseller size and promotion; product cards; reseller profiles. New questions need new dimensions or measures in the semantic layer, not new tools.
 - **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the backend directly.
 - **A traffic window for learning (debug feature).** Below the chat, the app shows every message on both lines: the AG-UI events between browser and agent, and the requests and streamed answers between agent and LLM provider. Nothing is hidden, so you can see exactly what the model gets.
 
@@ -77,7 +78,7 @@ SQL Server is published for amd64 only; on Apple Silicon it runs emulated and ne
 ### The demo model (no LLM)
 
 Without `agent/.env`, the agent talks to the demo model (`demo-model/`) instead of an LLM provider, so the app works without an API key and without cost.
-The demo model is no language model. It looks for keywords in the question and maps them to the semantic layer, which it reads from the system prompt: measures and dimensions become `groupBy`, values from the data become filters, "top 10" sets order and limit, a product model or "look like" searches the catalogue, "pin" pins the last chart, questions about people get the refusal from the rules. Every answer starts with "Demo mode, no real LLM", and what it does not understand gets an honest "I cannot answer that" plus revenue per year.
+The demo model is no language model. It looks for keywords in the question and maps them to the semantic layer, which it reads from the system prompt: measures and dimensions become `groupBy`, values from the data become filters, "top 10" sets order and limit, a product model or "look like" searches the catalogue, "who is" with a company name looks up the reseller, "what can you do" lists example questions, "pin" pins the last chart, questions about people get the refusal from the rules. Every answer starts with "Demo mode, no real LLM", and what it does not understand gets an honest "I cannot answer that" plus revenue per year.
 
 It answers in OpenAI's formats, so every agent reaches it as an OpenAI model without any special code: `agent/demo.env` sets `MODEL=openai/demo-no-llm` and points `OPENAI_BASE_URL` at it. Compose loads `agent/.env` after that file, so a real model there wins.
 

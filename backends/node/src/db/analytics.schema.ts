@@ -20,15 +20,22 @@ export const sales = analytics
     productName: varchar('product_name').notNull(),
     productSubcategory: varchar('product_subcategory').notNull(),
     productCategory: varchar('product_category').notNull(),
+    productColor: varchar('product_color'),
+    productLine: varchar('product_line'),
+    promotionName: varchar('promotion_name').notNull(),
+    promotionType: varchar('promotion_type').notNull(),
     salesTerritoryGroup: varchar('sales_territory_group'),
     salesTerritoryCountry: varchar('sales_territory_country').notNull(),
     salesTerritoryRegion: varchar('sales_territory_region').notNull(),
     resellerKey: integer('reseller_key'),
     resellerName: varchar('reseller_name'),
     resellerBusinessType: varchar('reseller_business_type'),
+    resellerAnnualRevenue: integer('reseller_annual_revenue'),
     orderQuantity: smallint('order_quantity'),
     salesAmount: numeric('sales_amount'),
     totalProductCost: numeric('total_product_cost'),
+    discountAmount: numeric('discount_amount'),
+    freight: numeric('freight'),
   })
   .existing();
 

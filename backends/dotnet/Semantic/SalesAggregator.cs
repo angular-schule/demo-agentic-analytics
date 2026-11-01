@@ -17,7 +17,7 @@ public sealed class GroupKey
     public string? S2 { get; init; }
 }
 
-/// <summary>One result row: the group key and the requested measures in M0..M4, in request order.</summary>
+/// <summary>One result row: the group key and the requested measures in M0..M7, in request order.</summary>
 public sealed class GroupRow
 {
     public GroupKey Key { get; init; } = new();
@@ -26,6 +26,9 @@ public sealed class GroupRow
     public decimal M2 { get; init; }
     public decimal M3 { get; init; }
     public decimal M4 { get; init; }
+    public decimal M5 { get; init; }
+    public decimal M6 { get; init; }
+    public decimal M7 { get; init; }
 }
 
 /// <summary>
@@ -46,7 +49,7 @@ public sealed class SalesAggregator(AnalyticsContext db)
     /// <summary>A slot of <see cref="GroupRow"/>: where to bind it, how to sort by it, how to read it from a loaded row.</summary>
     private sealed record Slot(PropertyInfo Property, LambdaExpression Member, Func<GroupRow, object?> Read);
 
-    private static readonly Dictionary<string, Slot> Slots = new[] { "I0", "I1", "I2", "S0", "S1", "S2", "M0", "M1", "M2", "M3", "M4" }
+    private static readonly Dictionary<string, Slot> Slots = new[] { "I0", "I1", "I2", "S0", "S1", "S2", "M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7" }
         .ToDictionary(name => name, name =>
         {
             var owner = name.StartsWith('M') ? typeof(GroupRow) : typeof(GroupKey);
@@ -153,7 +156,9 @@ public sealed class SalesAggregator(AnalyticsContext db)
     {
         var dimension = FindDimensionOrThrow(filter.Dimension);
         var sale = Expression.Parameter(typeof(Sale), "s");
-        var value = Rebind(dimension.Selector, sale);
+        var selected = Rebind(dimension.Selector, sale);
+        // Numeric dimensions compare as int?, so nullable columns such as the reseller's revenue fit as well.
+        var value = dimension.IsNumeric ? Expression.Convert(selected, typeof(int?)) : selected;
 
         if (filter.Values is null || filter.Values.Count == 0)
         {
@@ -163,15 +168,15 @@ public sealed class SalesAggregator(AnalyticsContext db)
         Expression body = filter.Operator switch
         {
             "eq" when filter.Values.Count == 1 => dimension.IsNumeric
-                ? Expression.Equal(value, Parameter(ReadInt(dimension, filter.Values[0])))
+                ? Expression.Equal(value, Parameter<int?>(ReadInt(dimension, filter.Values[0])))
                 : Expression.Equal(value, Parameter<string?>(ReadText(dimension, filter.Values[0]))),
             "in" => dimension.IsNumeric
-                ? Contains(filter.Values.Select(v => ReadInt(dimension, v)).ToList(), value)
+                ? Contains(filter.Values.Select(v => (int?)ReadInt(dimension, v)).ToList(), value)
                 : Contains(filter.Values.Select(v => (string?)ReadText(dimension, v)).ToList(), value),
             "gte" when dimension.IsNumeric && filter.Values.Count == 1 =>
-                Expression.GreaterThanOrEqual(value, Parameter(ReadInt(dimension, filter.Values[0]))),
+                Expression.GreaterThanOrEqual(value, Parameter<int?>(ReadInt(dimension, filter.Values[0]))),
             "lte" when dimension.IsNumeric && filter.Values.Count == 1 =>
-                Expression.LessThanOrEqual(value, Parameter(ReadInt(dimension, filter.Values[0]))),
+                Expression.LessThanOrEqual(value, Parameter<int?>(ReadInt(dimension, filter.Values[0]))),
             _ => throw new InvalidQueryException(
                 $"Operator '{filter.Operator}' does not fit dimension '{dimension.Name}'. Use eq (one value) or in (several values)"
                 + (dimension.IsNumeric ? ", or gte/lte (one value)." : ".")),

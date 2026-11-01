@@ -19,6 +19,8 @@ public sealed class AnalyticsContext(DbContextOptions<AnalyticsContext> options)
             e.ToView("AgentViewSales", "analytics").HasNoKey();
             e.Property(s => s.SalesAmount).HasColumnType("money");
             e.Property(s => s.TotalProductCost).HasColumnType("money");
+            e.Property(s => s.DiscountAmount).HasColumnType("money");
+            e.Property(s => s.Freight).HasColumnType("money");
         });
 
         modelBuilder.Entity<Reseller>(e =>

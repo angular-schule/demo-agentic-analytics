@@ -11,7 +11,11 @@ const EXAMPLES: Example[] = [
   { label: 'Revenue trend', prompt: 'How did revenue develop per quarter, split by sales channel?' },
   { label: 'Top resellers', prompt: 'Which 10 resellers in Germany bought the most? Show revenue and margin.' },
   { label: 'Margin by category', prompt: 'Compare the gross margin of the product categories in Europe in 2013.' },
+  { label: 'Discounts', prompt: 'How much discount did each promotion type grant, and how much revenue came with it?' },
+  { label: 'Shop size', prompt: 'Do larger resellers place bigger orders? Show the average order value per reseller annual revenue.' },
   { label: 'Bikes', prompt: 'Show me the Mountain-200 bikes.' },
+  { label: 'A reseller', prompt: 'Who is Brakes and Gears, and where are they located?' },
+  { label: 'What can you do?', prompt: 'What can you do for me?' },
   { label: 'Key account manager', prompt: 'Who is the key account manager of our biggest reseller?' },
 ];
 

@@ -20,12 +20,12 @@ GO
 -- One row per order line of both sales channels. Amounts in USD.
 CREATE VIEW analytics.AgentViewSales AS
 WITH Lines AS (
-  SELECT N'Online' AS Channel, SalesOrderNumber, OrderDateKey, ProductKey, SalesTerritoryKey,
-         CAST(NULL AS int) AS ResellerKey, OrderQuantity, SalesAmount, TotalProductCost
+  SELECT N'Online' AS Channel, SalesOrderNumber, OrderDateKey, ProductKey, SalesTerritoryKey, PromotionKey,
+         CAST(NULL AS int) AS ResellerKey, OrderQuantity, SalesAmount, TotalProductCost, DiscountAmount, Freight
   FROM dbo.FactInternetSales
   UNION ALL
-  SELECT N'Reseller', SalesOrderNumber, OrderDateKey, ProductKey, SalesTerritoryKey,
-         ResellerKey, OrderQuantity, SalesAmount, TotalProductCost
+  SELECT N'Reseller', SalesOrderNumber, OrderDateKey, ProductKey, SalesTerritoryKey, PromotionKey,
+         ResellerKey, OrderQuantity, SalesAmount, TotalProductCost, DiscountAmount, Freight
   FROM dbo.FactResellerSales
 )
 SELECT l.Channel,
@@ -38,21 +38,30 @@ SELECT l.Channel,
        p.EnglishProductName AS ProductName,
        ps.EnglishProductSubcategoryName AS ProductSubcategory,
        pc.EnglishProductCategoryName AS ProductCategory,
+       NULLIF(p.Color, N'NA') AS ProductColor,
+       CASE RTRIM(p.ProductLine) WHEN N'R' THEN N'Road' WHEN N'M' THEN N'Mountain' WHEN N'T' THEN N'Touring'
+                                 WHEN N'S' THEN N'Standard' END AS ProductLine,
+       pr.EnglishPromotionName AS PromotionName,
+       pr.EnglishPromotionType AS PromotionType,
        t.SalesTerritoryGroup,
        t.SalesTerritoryCountry,
        t.SalesTerritoryRegion,
        l.ResellerKey,
        r.ResellerName,
        r.BusinessType AS ResellerBusinessType,
+       CAST(r.AnnualRevenue AS int) AS ResellerAnnualRevenue,
        l.OrderQuantity,
        l.SalesAmount,
-       l.TotalProductCost
+       l.TotalProductCost,
+       CAST(l.DiscountAmount AS money) AS DiscountAmount,
+       l.Freight
 FROM Lines l
 JOIN dbo.DimDate d ON d.DateKey = l.OrderDateKey
 JOIN dbo.DimProduct p ON p.ProductKey = l.ProductKey
 JOIN dbo.DimProductSubcategory ps ON ps.ProductSubcategoryKey = p.ProductSubcategoryKey
 JOIN dbo.DimProductCategory pc ON pc.ProductCategoryKey = ps.ProductCategoryKey
 JOIN dbo.DimSalesTerritory t ON t.SalesTerritoryKey = l.SalesTerritoryKey
+JOIN dbo.DimPromotion pr ON pr.PromotionKey = l.PromotionKey
 LEFT JOIN dbo.DimReseller r ON r.ResellerKey = l.ResellerKey
 WHERE CAST(SESSION_CONTEXT(N'TerritoryGroup') AS nvarchar(50)) IN (N'*', t.SalesTerritoryGroup);
 GO

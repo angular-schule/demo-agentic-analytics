@@ -190,13 +190,22 @@ for (const [name, base] of Object.entries(agents)) {
       assert.ok(!result.content.includes('base64'), 'photos are loaded by the browser, not sent to the model');
     });
 
-    test('the model gets the rules, both tools, compact tool results and room for long answers', async () => {
+    test('the reseller lookup returns companies, not the people who work there', async () => {
+      const events = await run(base, 'Who is Brakes and Gears?');
+      const [call] = ofType(events, 'TOOL_CALL_START');
+      assert.equal(call.toolCallName, 'findResellers');
+      const { resellers } = JSON.parse(ofType(events, 'TOOL_CALL_RESULT')[0].content);
+      assert.equal(resellers[0].resellerName, 'Brakes and Gears');
+      assert.deepEqual(Object.keys(resellers[0]).sort(), ['annualRevenue', 'businessType', 'city', 'country', 'numberEmployees', 'resellerKey', 'resellerName', 'stateProvince', 'yearOpened']);
+    });
+
+    test('the model gets the rules, all backend tools, compact tool results and room for long answers', async () => {
       await resetFake();
       await run(base, 'Revenue per year, please');
       const [first, second] = (await fakeRequests()).map(request);
       assert.match(first.system, /Personal data is not part of the data model/);
       assert.doesNotMatch(first.system, /language/i, 'a language rule made the model switch languages, see the article');
-      assert.deepEqual(first.tools.map((t) => t.name).sort(), ['findProducts', 'querySales']);
+      assert.deepEqual(first.tools.map((t) => t.name).sort(), ['findProducts', 'findResellers', 'querySales']);
       // Anthropic's .NET adapter would otherwise send 1024; OpenAI's format may leave the limit to the provider.
       if (first.maxTokens !== undefined) assert.ok(first.maxTokens >= 8192, `max_tokens is ${first.maxTokens}`);
       assert.ok(!second.toolResult.includes('\n'), 'tool results go to the model as compact JSON');
@@ -250,7 +259,7 @@ for (const [format, dotnetAgent, nodeAgent] of [
     }
     const [dotnet, node] = requests;
     assert.equal(node.system, dotnet.system);
-    for (const tool of ['querySales', 'findProducts']) {
+    for (const tool of ['querySales', 'findProducts', 'findResellers']) {
       const schema = (r) => r.tools.find((t) => t.name === tool).schema;
       assert.deepEqual(enums(schema(node)), enums(schema(dotnet)), `enums of ${tool}`);
       assert.deepEqual(schema(node).required?.sort(), schema(dotnet).required?.sort(), `required fields of ${tool}`);
@@ -262,9 +271,14 @@ const EXAMPLES = [
   'How did revenue develop per quarter, split by sales channel?',
   'Which 10 resellers in Germany bought the most? Show revenue and margin.',
   'Compare the gross margin of the product categories in Europe in 2013.',
+  'How much discount did each promotion type grant, and how much revenue came with it?',
+  'Do larger resellers place bigger orders? Show the average order value per reseller annual revenue.',
   'Show me the Mountain-200 bikes.',
+  'Who is Brakes and Gears, and where are they located?',
+  'What can you do for me?',
   'Who is the key account manager of our biggest reseller?',
 ];
+const WITHOUT_TOOL = ['What can you do for me?', 'Who is the key account manager of our biggest reseller?'];
 
 for (const [name, base] of Object.entries(demoAgents)) {
   describe(`${name} with the demo model`, () => {
@@ -280,7 +294,7 @@ for (const [name, base] of Object.entries(demoAgents)) {
         assert.equal(events.at(-1).type, 'RUN_FINISHED');
         assert.match(text(events), /^Demo mode, no real LLM:/);
         for (const result of ofType(events, 'TOOL_CALL_RESULT')) assert.equal(JSON.parse(result.content).error, undefined, result.content);
-        assert.equal(ofType(events, 'TOOL_CALL_RESULT').length, question.includes('key account') ? 0 : 1);
+        assert.equal(ofType(events, 'TOOL_CALL_RESULT').length, WITHOUT_TOOL.includes(question) ? 0 : 1);
       });
     }
   });
