@@ -1,6 +1,6 @@
 namespace AgenticAnalytics.Api.Data;
 
-/// <summary>One order line from analytics.Sales (online and reseller channel).</summary>
+/// <summary>One order line from analytics.AgentViewSales (online and reseller channel).</summary>
 public sealed class Sale
 {
     public required string Channel { get; init; }
@@ -24,7 +24,7 @@ public sealed class Sale
     public decimal? TotalProductCost { get; init; }
 }
 
-/// <summary>A reseller (a company) from analytics.Resellers.</summary>
+/// <summary>A reseller (a company) from analytics.AgentViewResellers.</summary>
 public sealed class Reseller
 {
     public int ResellerKey { get; init; }
@@ -39,7 +39,7 @@ public sealed class Reseller
     public int? YearOpened { get; init; }
 }
 
-/// <summary>A catalogue entry from analytics.Products.</summary>
+/// <summary>A catalogue entry from analytics.AgentViewProducts.</summary>
 public sealed class Product
 {
     public int ProductKey { get; init; }

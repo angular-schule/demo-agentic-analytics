@@ -29,7 +29,7 @@ public sealed class GroupRow
 }
 
 /// <summary>
-/// Turns an <see cref="AggregateRequest"/> into one LINQ query over analytics.Sales. Every column
+/// Turns an <see cref="AggregateRequest"/> into one LINQ query over analytics.AgentViewSales. Every column
 /// comes from <see cref="SalesModel"/>, every value travels as a query parameter; EF Core writes
 /// the SQL.
 /// </summary>

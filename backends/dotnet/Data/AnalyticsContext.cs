@@ -16,20 +16,20 @@ public sealed class AnalyticsContext(DbContextOptions<AnalyticsContext> options)
     {
         modelBuilder.Entity<Sale>(e =>
         {
-            e.ToView("Sales", "analytics").HasNoKey();
+            e.ToView("AgentViewSales", "analytics").HasNoKey();
             e.Property(s => s.SalesAmount).HasColumnType("money");
             e.Property(s => s.TotalProductCost).HasColumnType("money");
         });
 
         modelBuilder.Entity<Reseller>(e =>
         {
-            e.ToView("Resellers", "analytics").HasNoKey();
+            e.ToView("AgentViewResellers", "analytics").HasNoKey();
             e.Property(r => r.AnnualRevenue).HasColumnType("money");
         });
 
         modelBuilder.Entity<Product>(e =>
         {
-            e.ToView("Products", "analytics").HasNoKey();
+            e.ToView("AgentViewProducts", "analytics").HasNoKey();
             e.Property(p => p.ListPrice).HasColumnType("money");
         });
     }

@@ -25,7 +25,7 @@ export interface MeasureDefinition {
 }
 
 /**
- * The semantic layer over analytics.sales: the complete list of dimensions and measures a caller
+ * The semantic layer over analytics.agent_view_sales: the complete list of dimensions and measures a caller
  * (in the end, an LLM) may use. Names outside these lists are rejected, so no request
  * can reach a column that is not listed here.
  */

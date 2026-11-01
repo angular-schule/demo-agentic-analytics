@@ -14,7 +14,7 @@ import {
 } from './sales-model';
 
 /**
- * Turns an aggregate request into one Drizzle query over analytics.sales. Every column comes from
+ * Turns an aggregate request into one Drizzle query over analytics.agent_view_sales. Every column comes from
  * the semantic model, every value travels as a query parameter.
  */
 @Injectable()

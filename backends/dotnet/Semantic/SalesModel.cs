@@ -24,7 +24,7 @@ public sealed record MeasureDefinition(
     Expression<Func<IEnumerable<Sale>, decimal>> Aggregate);
 
 /// <summary>
-/// The semantic layer over analytics.Sales: the complete list of dimensions and measures a caller
+/// The semantic layer over analytics.AgentViewSales: the complete list of dimensions and measures a caller
 /// (in the end, an LLM) may use. Names outside these lists are rejected, so no request
 /// can reach a column that is not listed here.
 /// </summary>

@@ -9,7 +9,7 @@ const analytics = pgSchema('analytics');
 const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
 export const sales = analytics
-  .view('sales', {
+  .view('agent_view_sales', {
     channel: varchar('channel').notNull(),
     salesOrderNumber: varchar('sales_order_number').notNull(),
     orderDate: date('order_date', { mode: 'string' }).notNull(),
@@ -33,7 +33,7 @@ export const sales = analytics
   .existing();
 
 export const resellers = analytics
-  .view('resellers', {
+  .view('agent_view_resellers', {
     resellerKey: integer('reseller_key').notNull(),
     resellerName: varchar('reseller_name').notNull(),
     businessType: varchar('business_type').notNull(),
@@ -48,7 +48,7 @@ export const resellers = analytics
   .existing();
 
 export const products = analytics
-  .view('products', {
+  .view('agent_view_products', {
     productKey: integer('product_key').notNull(),
     productName: varchar('product_name').notNull(),
     modelName: varchar('model_name'),

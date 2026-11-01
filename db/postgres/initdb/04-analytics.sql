@@ -1,5 +1,8 @@
 -- The analytics schema is the only thing the application is allowed to read.
 --
+-- Every view carries the prefix agent_view_, as the warehouse tables carry fact_ and dim_: the name
+-- says what the view is for, so it can later be traced to the application that reads it.
+--
 -- Data minimisation: the views contain no reference to a natural person. Customers (online sales)
 -- and sales representatives (reseller sales, the "key account managers") stay in dw and never
 -- appear here, not even as a key. Companies are not persons, so resellers keep their names.
@@ -12,7 +15,7 @@
 CREATE SCHEMA analytics;
 
 -- One row per order line of both sales channels. Amounts in USD.
-CREATE VIEW analytics.sales WITH (security_barrier) AS
+CREATE VIEW analytics.agent_view_sales WITH (security_barrier) AS
 WITH lines AS (
   SELECT 'Online' AS channel, sales_order_number, order_date_key, product_key, sales_territory_key,
          NULL::integer AS reseller_key, order_quantity, sales_amount, total_product_cost
@@ -52,7 +55,7 @@ WHERE current_setting('analytics.territory_group', true) IN ('*', t.sales_territ
 
 -- Resellers are companies. Phone, street address and bank details are left out anyway:
 -- an analysis does not need them.
-CREATE VIEW analytics.resellers WITH (security_barrier) AS
+CREATE VIEW analytics.agent_view_resellers WITH (security_barrier) AS
 SELECT r.reseller_key,
        r.reseller_name,
        r.business_type,
@@ -69,7 +72,7 @@ JOIN dw.dim_sales_territory t ON t.sales_territory_key = g.sales_territory_key
 WHERE current_setting('analytics.territory_group', true) IN ('*', t.sales_territory_group);
 
 -- The product catalogue is the same for every territory.
-CREATE VIEW analytics.products AS
+CREATE VIEW analytics.agent_view_products AS
 SELECT p.product_key,
        p.english_product_name AS product_name,
        p.model_name,

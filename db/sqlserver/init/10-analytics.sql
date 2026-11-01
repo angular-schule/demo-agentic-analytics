@@ -1,5 +1,8 @@
 -- The analytics schema is the only thing the application is allowed to read.
 --
+-- Every view carries the prefix AgentView, as the warehouse tables carry Fact and Dim: the name says
+-- what the view is for, so it can later be traced to the application that reads it.
+--
 -- Data minimisation: the views contain no reference to a natural person. Customers (online sales)
 -- and sales representatives (reseller sales, the "key account managers") stay in dbo and never
 -- appear here, not even as a key. Companies are not persons, so resellers keep their names.
@@ -15,7 +18,7 @@ CREATE SCHEMA analytics AUTHORIZATION dbo;
 GO
 
 -- One row per order line of both sales channels. Amounts in USD.
-CREATE VIEW analytics.Sales AS
+CREATE VIEW analytics.AgentViewSales AS
 WITH Lines AS (
   SELECT N'Online' AS Channel, SalesOrderNumber, OrderDateKey, ProductKey, SalesTerritoryKey,
          CAST(NULL AS int) AS ResellerKey, OrderQuantity, SalesAmount, TotalProductCost
@@ -56,7 +59,7 @@ GO
 
 -- Resellers are companies. Phone, street address and bank details are left out anyway:
 -- an analysis does not need them.
-CREATE VIEW analytics.Resellers AS
+CREATE VIEW analytics.AgentViewResellers AS
 SELECT r.ResellerKey,
        r.ResellerName,
        r.BusinessType,
@@ -74,7 +77,7 @@ WHERE CAST(SESSION_CONTEXT(N'TerritoryGroup') AS nvarchar(50)) IN (N'*', t.Sales
 GO
 
 -- The product catalogue is the same for every territory.
-CREATE VIEW analytics.Products AS
+CREATE VIEW analytics.AgentViewProducts AS
 SELECT p.ProductKey,
        p.EnglishProductName AS ProductName,
        p.ModelName,

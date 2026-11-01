@@ -27,7 +27,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U AnalyticsReader -P "$$ANALYTICS_READER_PASSWORD" -d AdventureWorksDW -Q "SELECT TOP (1) ProductKey FROM analytics.Products"
+        - /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U AnalyticsReader -P "$$ANALYTICS_READER_PASSWORD" -d AdventureWorksDW -Q "SELECT TOP (1) ProductKey FROM analytics.AgentViewProducts"
       interval: 5s
       retries: 60
 
@@ -46,7 +46,7 @@ services:
       # TCP only accepts connections once the first-start import has finished.
       test:
         - CMD-SHELL
-        - PGPASSWORD="$$ANALYTICS_READER_PASSWORD" psql -h localhost -U analytics_reader -d adventureworks -c "SELECT 1 FROM analytics.products LIMIT 1"
+        - PGPASSWORD="$$ANALYTICS_READER_PASSWORD" psql -h localhost -U analytics_reader -d adventureworks -c "SELECT 1 FROM analytics.agent_view_products LIMIT 1"
       interval: 5s
       retries: 60
 
