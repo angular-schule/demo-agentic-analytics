@@ -3,7 +3,13 @@
 Ask a sales database questions in plain language and get charts back, right inside an Angular app.
 Pin the answers you like to a dashboard that keeps working without the LLM.
 
-The demo accompanies the article **[Agentic Analytics with Angular, CopilotKit and Mastra](https://angular.schule/blog/2026-11-agentic-analytics)** on angular.schule.
+The demo accompanies the article series **Agentic Analytics with Angular** on angular.schule:
+
+1. [Architecture, and Keeping Personal Data Out](https://angular.schule/blog/2026-11-agentic-analytics)
+2. The backend, in one of two variants: [Node.js with Mastra](https://angular.schule/blog/2026-11-agentic-analytics-node) or [.NET with the Microsoft Agent Framework](https://angular.schule/blog/2026-11-agentic-analytics-dotnet)
+3. [Generative UI with CopilotKit](https://angular.schule/blog/2026-11-agentic-analytics-angular)
+4. [Compare, Watch and Fine-Tune the Agent](https://angular.schule/blog/2026-11-agentic-analytics-in-practice)
+
 It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analytics App with Angular* ([his demo](https://github.com/manfredsteyer/agentic-sales)) and rebuilt with its own data, its own backends and a strong focus on data protection.
 
 ![The app: chat on the left, pinned dashboard on the right](docs/screenshot.png)
@@ -18,6 +24,7 @@ It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analy
 - **Data minimisation.** Company names are part of the data, people are not: no sales representatives, key account managers or contact persons. The classic AdventureWorks analysis of bike buyers by age, income and commute distance is left out on purpose, because it is about private persons. The database account of the backends can only read three views that contain no personal data, filtered to a configurable territory.
 - **Two interchangeable backends** with the same HTTP contract and the same AdventureWorks data: ASP.NET Core with Entity Framework Core and SQL Server, or NestJS with Drizzle and PostgreSQL. Each generates its OpenAPI document from its own code and shows it in Swagger UI; contract tests make sure both documents describe the same contract and both backends give identical answers.
 - **Many questions, few tools.** Revenue, cost, margin, units, orders, average order value, discounts and freight, by time, channel, product, colour, product line, territory, reseller, reseller size and promotion; product cards; reseller profiles. New questions need new dimensions or measures in the semantic layer, not new tools.
+- **The agent explains itself.** Example questions above the chat send a prepared question with one click. Asked what it can do, the agent suggests questions that the semantic layer can answer; it knows the semantic layer from its system prompt.
 - **A dashboard without tokens.** A pinned view stores the query, not the numbers. Tiles ask the backend directly.
 - **A traffic window for learning (debug feature).** Below the chat, the app shows every message on both lines: the AG-UI events between browser and agent, and the requests and streamed answers between agent and LLM provider. Nothing is hidden, so you can see exactly what the model gets.
 
@@ -116,12 +123,24 @@ Each part can run on its own, against databases started with Compose:
 docker compose --profile node up postgres
 
 cd backends/node && npm ci && npm run build && \
-  DATABASE_URL=postgres://analytics_reader:<password>@127.0.0.1:5434/adventureworks PORT=8082 npm start
+  DATABASE_URL=postgres://analytics_reader:<password>@127.0.0.1:5434/adventureworks DATA_SCOPE='*' PORT=8082 npm start
 
 cd frontend && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start   # http://localhost:4200
 ```
 
-The backend reads `MODEL` and the API key from its environment. For the separate agent service instead:
+The ASP.NET Core backend works the same way against SQL Server (the frontend's dev server forwards to port 8081 by default):
+
+```bash
+docker compose --profile dotnet up sqlserver
+
+cd backends/dotnet && \
+  ConnectionStrings__Analytics='Server=127.0.0.1,14330;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=<password>;TrustServerCertificate=True' \
+  DATA_SCOPE='*' ASPNETCORE_URLS=http://127.0.0.1:8081 dotnet run
+
+cd frontend && npm ci && npm start   # http://localhost:4200
+```
+
+Both backends read `MODEL` and the API key from their environment. For the separate agent service instead:
 
 ```bash
 cd agent && npm ci && DATA_API_URL=http://127.0.0.1:8082 npm start
@@ -147,7 +166,7 @@ docker compose -f compose.yaml -f compose.test.yaml --profile dotnet --profile n
 node --test 'contract/*.test.mjs'
 ```
 
-**Browser tests** with Playwright drive the app on http://localhost:8080: chart, pinning by button and by chat, the dashboard after a reload without the model, product cards, the traffic window. They use the installed Google Chrome. Start one backend behind the web server (`--profile node` or `--profile dotnet`; add `--profile agent` and `AGENT_URL=http://agent:4111` for the separate agent service):
+**Browser tests** with Playwright drive the app on http://localhost:8080: the header, chart, pinning by button and by chat, the dashboard after a reload without the model, product cards, a request outside the semantic layer, the traffic window with and without `DEBUG_TRAFFIC`. They use the installed Google Chrome. Start one backend behind the web server (`--profile node` or `--profile dotnet`; add `--profile agent` and `AGENT_URL=http://agent:4111` for the separate agent service):
 
 ```bash
 docker compose -f compose.yaml -f compose.test.yaml --profile node up -d --build

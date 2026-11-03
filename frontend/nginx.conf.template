@@ -30,7 +30,9 @@ server {
     add_header Cache-Control immutable;
   }
 
+  # index.html names the current bundle: the browser asks again every time, so a new build arrives at once.
   location / {
+    add_header Cache-Control no-cache;
     try_files $uri $uri/ /index.html;
   }
 }

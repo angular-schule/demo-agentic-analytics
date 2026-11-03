@@ -80,7 +80,8 @@ JOIN dw.dim_geography g ON g.geography_key = r.geography_key
 JOIN dw.dim_sales_territory t ON t.sales_territory_key = g.sales_territory_key
 WHERE current_setting('analytics.territory_group', true) IN ('*', t.sales_territory_group);
 
--- The product catalogue is the same for every territory.
+-- The product catalogue is the same for every territory. dim_product keeps a row per price change;
+-- the catalogue shows the latest version of each product.
 CREATE VIEW analytics.agent_view_products AS
 SELECT p.product_key,
        p.english_product_name AS product_name,
@@ -93,4 +94,5 @@ SELECT p.product_key,
        p.large_photo
 FROM dw.dim_product p
 LEFT JOIN dw.dim_product_subcategory ps ON ps.product_subcategory_key = p.product_subcategory_key
-LEFT JOIN dw.dim_product_category pc ON pc.product_category_key = ps.product_category_key;
+LEFT JOIN dw.dim_product_category pc ON pc.product_category_key = ps.product_category_key
+WHERE NOT EXISTS (SELECT 1 FROM dw.dim_product n WHERE n.product_alternate_key = p.product_alternate_key AND n.start_date > p.start_date);

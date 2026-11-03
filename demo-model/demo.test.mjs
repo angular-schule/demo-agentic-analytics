@@ -59,7 +59,7 @@ test('the example questions of the app', () => {
     groupBy: ['promotionType'],
   });
 
-  assert.deepEqual(ask('Do larger resellers place bigger orders? Show the average order value per reseller annual revenue.').input.query, {
+  assert.deepEqual(ask('Do larger resellers place bigger orders? Show only the average order value per reseller annual revenue class.').input.query, {
     measures: ['averageOrderValue'],
     groupBy: ['resellerAnnualRevenue'],
   });

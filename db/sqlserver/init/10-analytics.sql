@@ -85,7 +85,8 @@ JOIN dbo.DimSalesTerritory t ON t.SalesTerritoryKey = g.SalesTerritoryKey
 WHERE CAST(SESSION_CONTEXT(N'TerritoryGroup') AS nvarchar(50)) IN (N'*', t.SalesTerritoryGroup);
 GO
 
--- The product catalogue is the same for every territory.
+-- The product catalogue is the same for every territory. DimProduct keeps a row per price change;
+-- the catalogue shows the latest version of each product.
 CREATE VIEW analytics.AgentViewProducts AS
 SELECT p.ProductKey,
        p.EnglishProductName AS ProductName,
@@ -98,7 +99,8 @@ SELECT p.ProductKey,
        p.LargePhoto
 FROM dbo.DimProduct p
 LEFT JOIN dbo.DimProductSubcategory ps ON ps.ProductSubcategoryKey = p.ProductSubcategoryKey
-LEFT JOIN dbo.DimProductCategory pc ON pc.ProductCategoryKey = ps.ProductCategoryKey;
+LEFT JOIN dbo.DimProductCategory pc ON pc.ProductCategoryKey = ps.ProductCategoryKey
+WHERE NOT EXISTS (SELECT 1 FROM dbo.DimProduct n WHERE n.ProductAlternateKey = p.ProductAlternateKey AND n.StartDate > p.StartDate);
 GO
 
 -- The application connects as AnalyticsReader. It can read the analytics views and nothing else:

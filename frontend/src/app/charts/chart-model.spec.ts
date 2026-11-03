@@ -72,6 +72,8 @@ describe('formatting', () => {
     expect(formatDimension('quarter', 2)).toBe('Q2');
     expect(formatDimension('month', 12)).toBe('Dec');
     expect(formatDimension('reseller', null)).toBe('(none)');
+    expect(formatDimension('resellerAnnualRevenue', 300000)).toBe('300,000');
+    expect(formatDimension('year', 2013)).toBe('2013');
   });
 
   it('writes money in full for tables and compact for axes', () => {

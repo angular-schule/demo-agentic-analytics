@@ -55,6 +55,8 @@ export function formatDimension(name: string, value: CellValue): string {
   if (value === null) return '(none)';
   if (name === 'quarter') return `Q${value}`;
   if (name === 'month' && typeof value === 'number') return MONTHS[value - 1] ?? String(value);
+  // Numeric classes such as the reseller's annual revenue read better grouped: 30,000.
+  if (typeof value === 'number' && !TIME_DIMENSIONS.includes(name)) return integer.format(value);
   return String(value);
 }
 

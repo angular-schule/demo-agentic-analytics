@@ -272,7 +272,7 @@ const EXAMPLES = [
   'Which 10 resellers in Germany bought the most? Show revenue and margin.',
   'Compare the gross margin of the product categories in Europe in 2013.',
   'How much discount did each promotion type grant, and how much revenue came with it?',
-  'Do larger resellers place bigger orders? Show the average order value per reseller annual revenue.',
+  'Do larger resellers place bigger orders? Show only the average order value per reseller annual revenue class.',
   'Show me the Mountain-200 bikes.',
   'Who is Brakes and Gears, and where are they located?',
   'What can you do for me?',
