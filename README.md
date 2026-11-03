@@ -105,6 +105,7 @@ MODEL=mistral/mistral-large-latest    # MISTRAL_API_KEY, optional MISTRAL_BASE_U
 
 `DATA_SCOPE` in `.env` limits what the backends may see: `*` for everything, or one territory group (`Europe`, `North America`, `Pacific`).
 The restriction is enforced in the database: the views filter by a session value that the backend sets for every connection (read-only session context in SQL Server, a connection parameter in PostgreSQL). Without that value the views return no rows.
+There is deliberately no switch in the app: the scope is a boundary of the server. After changing it, restart the backend (e.g. `docker compose --profile node up -d node-api`); the header then shows the restricted scope, e.g. "Scope: Europe".
 
 ### The traffic window (debug feature)
 
