@@ -12,6 +12,8 @@ export interface DimensionDefinition {
   isTime: boolean;
   /** Whether /api/schema lists the distinct values (only for small sets). */
   listValues: boolean;
+  /** Grouping by it leaves out the order lines without a value. */
+  skipsEmpty?: boolean;
   column: PgColumn;
 }
 
@@ -42,9 +44,9 @@ export const DIMENSIONS: readonly DimensionDefinition[] = [
   { name: 'territoryGroup', label: 'Territory group', description: 'Sales territory group (continent level).', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryGroup },
   { name: 'country', label: 'Country', description: 'Country of the sales territory.', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryCountry },
   { name: 'region', label: 'Region', description: 'Sales territory region. The United States is split into five regions, every other country is one region.', isNumeric: false, isTime: false, listValues: true, column: sales.salesTerritoryRegion },
-  { name: 'reseller', label: 'Reseller', description: 'Name of the reseller company. Empty for online sales.', isNumeric: false, isTime: false, listValues: false, column: sales.resellerName },
-  { name: 'resellerBusinessType', label: 'Reseller business type', description: 'Kind of reseller. Empty for online sales.', isNumeric: false, isTime: false, listValues: true, column: sales.resellerBusinessType },
-  { name: 'resellerAnnualRevenue', label: 'Reseller annual revenue', description: 'Annual revenue class of the reseller company in USD, a measure of its size. Empty for online sales.', isNumeric: true, isTime: false, listValues: true, column: sales.resellerAnnualRevenue },
+  { name: 'reseller', label: 'Reseller', description: 'Name of the reseller company. Grouping by it covers reseller sales only.', isNumeric: false, isTime: false, listValues: false, skipsEmpty: true, column: sales.resellerName },
+  { name: 'resellerBusinessType', label: 'Reseller business type', description: 'Kind of reseller. Grouping by it covers reseller sales only.', isNumeric: false, isTime: false, listValues: true, skipsEmpty: true, column: sales.resellerBusinessType },
+  { name: 'resellerAnnualRevenue', label: 'Reseller annual revenue', description: 'Annual revenue class of the reseller company in USD, a measure of its size. Grouping by it covers reseller sales only.', isNumeric: true, isTime: false, listValues: true, skipsEmpty: true, column: sales.resellerAnnualRevenue },
   { name: 'promotion', label: 'Promotion', description: "Promotion the order line was sold under, e.g. 'Volume Discount 11 to 14'. 'No Discount' when there was none.", isNumeric: false, isTime: false, listValues: true, column: sales.promotionName },
   { name: 'promotionType', label: 'Promotion type', description: 'Kind of promotion, e.g. a volume discount or the clearance of a discontinued product.', isNumeric: false, isTime: false, listValues: true, column: sales.promotionType },
 ];

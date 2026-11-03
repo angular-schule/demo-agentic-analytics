@@ -199,14 +199,14 @@
         {
             "name": "reseller",
             "label": "Reseller",
-            "description": "Name of the reseller company. Empty for online sales.",
+            "description": "Name of the reseller company. Grouping by it covers reseller sales only.",
             "type": "string",
             "values": null
         },
         {
             "name": "resellerBusinessType",
             "label": "Reseller business type",
-            "description": "Kind of reseller. Empty for online sales.",
+            "description": "Kind of reseller. Grouping by it covers reseller sales only.",
             "type": "string",
             "values": [
                 "Specialty Bike Shop",
@@ -217,7 +217,7 @@
         {
             "name": "resellerAnnualRevenue",
             "label": "Reseller annual revenue",
-            "description": "Annual revenue class of the reseller company in USD, a measure of its size. Empty for online sales.",
+            "description": "Annual revenue class of the reseller company in USD, a measure of its size. Grouping by it covers reseller sales only.",
             "type": "integer",
             "values": [
                 30000,

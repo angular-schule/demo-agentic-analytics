@@ -76,3 +76,12 @@ app-chat-panel textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/*
+ * CopilotKit fades the messages out behind the input with a fixed-height gradient. A disclaimer that wraps
+ * onto a second line reaches above that gradient, so it gets the panel's own background.
+ */
+app-chat-panel copilot-chat-view-disclaimer {
+  display: block;
+  background: var(--surface-1);
+}

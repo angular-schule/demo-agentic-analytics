@@ -83,6 +83,11 @@ public sealed class SalesAggregator(AnalyticsContext db)
         {
             filtered = filtered.Where(BuildFilter(filter));
         }
+        // Online sales have no reseller: one unnamed group holding all of them would only confuse.
+        foreach (var dimension in dimensions.Where(d => d.SkipsEmpty))
+        {
+            filtered = filtered.Where(HasValue(dimension));
+        }
 
         var groups = dimensions.Count == 0
             ? filtered.GroupBy(_ => new GroupKey { I0 = 0 })
@@ -150,6 +155,14 @@ public sealed class SalesAggregator(AnalyticsContext db)
         var values = measures.Select((measure, index) => Expression.Bind(MeasureSlot(index).Property, Rebind(measure.Aggregate, group)));
         return Expression.Lambda<Func<IGrouping<GroupKey, Sale>, GroupRow>>(
             Expression.MemberInit(Expression.New(typeof(GroupRow)), values.Prepend(key)), group);
+    }
+
+    /// <summary>s => s.ResellerName != null</summary>
+    private static Expression<Func<Sale, bool>> HasValue(DimensionDefinition dimension)
+    {
+        var sale = Expression.Parameter(typeof(Sale), "s");
+        var value = Rebind(dimension.Selector, sale);
+        return Expression.Lambda<Func<Sale, bool>>(Expression.NotEqual(value, Expression.Constant(null, value.Type)), sale);
     }
 
     private static Expression<Func<Sale, bool>> BuildFilter(FilterRequest filter)

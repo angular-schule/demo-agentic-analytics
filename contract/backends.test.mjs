@@ -101,7 +101,7 @@ describe('semantic layer', () => {
     });
   });
 
-  test('top resellers in Germany, online sales as the empty reseller', async () => {
+  test('top resellers in Germany: grouping by reseller leaves out online sales', async () => {
     const { payload } = await aggregate({
       measures: ['revenue'],
       groupBy: ['reseller'],
@@ -109,11 +109,16 @@ describe('semantic layer', () => {
       limit: 5,
     });
     assert.equal(payload.truncated, true);
-    assert.equal(payload.rows[0].reseller, null);
+    assert.ok(payload.rows.every((r) => r.reseller !== null));
+  });
+
+  test('reseller business types without an empty group for online sales', async () => {
+    const { payload } = await aggregate({ measures: ['orders'], groupBy: ['resellerBusinessType'] });
+    assert.deepEqual(payload.rows.map((r) => r.resellerBusinessType).sort(), ['Specialty Bike Shop', 'Value Added Reseller', 'Warehouse']);
   });
 
   test('ascending order by a nullable dimension puts the empty group first', async () => {
-    await aggregate({ measures: ['orders'], groupBy: ['resellerBusinessType'], orderBy: { field: 'resellerBusinessType', direction: 'asc' } });
+    await aggregate({ measures: ['orders'], groupBy: ['color'], orderBy: { field: 'color', direction: 'asc' } });
   });
 
   test('every product in one answer', async () => {

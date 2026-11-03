@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, lte, SQL, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte, SQL, sql } from 'drizzle-orm';
 import { PgColumn } from 'drizzle-orm/pg-core';
 import { sales } from '../db/analytics.schema';
 import { DrizzleService } from '../db/drizzle.service';
@@ -45,7 +45,8 @@ export class SalesAggregatorService {
     let query = this.drizzle.db
       .select(selection)
       .from(sales)
-      .where(and(...filters.map(buildFilter)))
+      // Online sales have no reseller: one unnamed group holding all of them would only confuse.
+      .where(and(...filters.map(buildFilter), ...dimensions.filter((d) => d.skipsEmpty).map((d) => isNotNull(d.column))))
       .$dynamic();
     if (dimensions.length > 0) {
       query = query.groupBy(...dimensions.map((d) => d.column));
