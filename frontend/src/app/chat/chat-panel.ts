@@ -22,7 +22,7 @@ const EXAMPLES: Example[] = [
   { label: 'Discounts', form: 'table', prompt: 'How much discount did each promotion type grant, and how much revenue came with it? Show it as a table.' },
   { label: 'Bikes', form: 'products', prompt: 'Show me the Mountain-200 bikes.' },
   { label: 'A reseller', form: 'company', prompt: 'Who is Brakes and Gears, and where are they located?' },
-  { label: 'No access to personal data', form: 'privacy', prompt: 'Who is the key account manager of our biggest reseller?' },
+  { label: 'Key account manager', form: 'privacy', prompt: 'Who is the key account manager of our biggest reseller?' },
 ];
 
 @Component({
