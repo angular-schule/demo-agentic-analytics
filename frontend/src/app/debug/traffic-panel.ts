@@ -2,7 +2,7 @@
 // the window shows the whole conversation, every tool result and the agent's answers.
 
 import { JsonPipe } from '@angular/common';
-import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { type AgUiEvent, agUiExchanges } from './agui-traffic';
 
 /** What the agent sent to the LLM provider and what came back, recorded by the backend (or the agent service). */
@@ -41,6 +41,16 @@ const KEPT_EXCHANGES = 50;
   selector: 'app-traffic-panel',
   imports: [JsonPipe],
   template: `
+    <div
+      class="resize"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize the traffic window"
+      title="Drag to resize, drag down to close"
+      tabindex="0"
+      (pointerdown)="startResize($event)"
+      (keydown)="resizeByKey($event)"
+    ></div>
     <header>
       <button type="button" class="toggle" [attr.aria-expanded]="open()" (click)="open.set(!open())">
         {{ open() ? '▾' : '▸' }} Traffic
@@ -58,7 +68,7 @@ const KEPT_EXCHANGES = 50;
       </span>
     </header>
     @if (open()) {
-      <div class="body">
+      <div class="body" [style.height.px]="height()">
         <ol class="list">
           @for (entry of entries(); track entry.id) {
             <li>
@@ -106,6 +116,9 @@ const KEPT_EXCHANGES = 50;
 })
 export class TrafficPanel {
   protected readonly open = signal(true);
+  /** Height of the open window in pixels, set by dragging; until then the stylesheet decides. */
+  protected readonly height = signal<number | null>(null);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly tab = signal<Tab>('ag-ui');
   private readonly selectedId = signal<number | null>(null);
 
@@ -137,6 +150,45 @@ export class TrafficPanel {
     this.tab.set(tab);
     this.selectedId.set(null);
     this.open.set(true);
+  }
+
+  /** Drags the top edge: up makes the window taller, down to the header closes it, up again reopens it. */
+  protected startResize(event: PointerEvent): void {
+    event.preventDefault();
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    const move = (e: PointerEvent) => this.resizeTo(window.innerHeight - e.clientY - this.chromeHeight());
+    const stop = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', stop);
+      handle.removeEventListener('pointercancel', stop);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+  }
+
+  protected resizeByKey(event: KeyboardEvent): void {
+    const step = event.key === 'ArrowUp' ? 40 : event.key === 'ArrowDown' ? -40 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const body = this.host.nativeElement.querySelector<HTMLElement>('.body');
+    this.resizeTo((this.open() && body ? body.offsetHeight : 0) + step);
+  }
+
+  private resizeTo(bodyHeight: number): void {
+    if (bodyHeight < 60) {
+      this.open.set(false);
+      return;
+    }
+    this.open.set(true);
+    this.height.set(Math.round(Math.min(bodyHeight, window.innerHeight * 0.8)));
+  }
+
+  /** Everything of the window above its body: the drag handle and the header. */
+  private chromeHeight(): number {
+    const header = this.host.nativeElement.querySelector('header');
+    return (header?.getBoundingClientRect().bottom ?? 0) - this.host.nativeElement.getBoundingClientRect().top;
   }
 
   protected select(id: number): void {

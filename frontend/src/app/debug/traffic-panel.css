@@ -7,6 +7,37 @@
   font-size: 0.8125rem;
 }
 
+.resize {
+  position: relative;
+  flex: none;
+  height: 0.6rem;
+  margin-top: -1px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+/* The grip in the middle of the edge. */
+.resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3rem;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-color);
+  transform: translate(-50%, -50%);
+}
+
+.resize:hover::after,
+.resize:focus-visible::after {
+  background: var(--brand-strong);
+}
+
+.resize:focus-visible {
+  outline: none;
+}
+
 header {
   display: flex;
   flex-wrap: wrap;

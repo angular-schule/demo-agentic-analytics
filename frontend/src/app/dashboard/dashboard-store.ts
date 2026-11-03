@@ -30,7 +30,7 @@ export class DashboardStore {
   /** Pins a parsed view, unless the same view is already on the dashboard. */
   pin(view: SalesView): boolean {
     if (this.isPinned(view)) return false;
-    this.tilesState.update((tiles) => [...tiles, { ...view, id: crypto.randomUUID() }]);
+    this.tilesState.update((tiles) => [...tiles, { ...view, id: tileId() }]);
     return true;
   }
 
@@ -45,6 +45,14 @@ export class DashboardStore {
   clear(): void {
     this.tilesState.set([]);
   }
+}
+
+/**
+ * A random id for a tile. crypto.randomUUID exists only in secure contexts (HTTPS or localhost);
+ * getRandomValues works everywhere, also when the app is opened by its LAN address over HTTP.
+ */
+function tileId(): string {
+  return Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(16).padStart(8, '0')).join('-');
 }
 
 /** Compares views by content: parsing puts the keys in schema order and drops unknown ones. */
