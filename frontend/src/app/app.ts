@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { Component, computed, effect } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { ChatPanel } from './chat/chat-panel';
 import { Dashboard } from './dashboard/dashboard';
 import { agUiTrafficEnabled } from './debug/agui-traffic';
@@ -37,8 +37,18 @@ const BACKENDS: Record<DataBackendHealth['backend'], string> = {
         }
       </ul>
     </header>
-    <main>
+    <main [style.--chat-width]="chatWidth() === null ? null : chatWidth() + 'px'">
       <app-chat-panel />
+      <div
+        class="resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the chat"
+        title="Drag to resize the chat"
+        tabindex="0"
+        (pointerdown)="startResize($event)"
+        (keydown)="resizeByKey($event)"
+      ></div>
       <app-dashboard />
     </main>
     <!-- DEBUG ONLY: the traffic window, switched off with DEBUG_TRAFFIC=off. -->
@@ -73,7 +83,43 @@ export class App {
     return scope === '*' ? null : scope;
   });
 
+  /** Width of the chat in pixels, set by dragging the edge to the dashboard; until then the stylesheet decides. */
+  protected readonly chatWidth = signal<number | null>(null);
+
   constructor() {
     effect(() => agUiTrafficEnabled.set(this.debugTraffic()));
+  }
+
+  protected startResize(event: PointerEvent): void {
+    event.preventDefault();
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    // Without this, dragging selects the text of the whole page on the way.
+    const root = document.documentElement;
+    root.style.userSelect = 'none';
+    const move = (e: PointerEvent) => this.resizeTo(e.clientX);
+    const stop = () => {
+      root.style.userSelect = '';
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', stop);
+      handle.removeEventListener('pointercancel', stop);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+  }
+
+  protected resizeByKey(event: KeyboardEvent): void {
+    const step = event.key === 'ArrowRight' ? 40 : event.key === 'ArrowLeft' ? -40 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const chat = (event.currentTarget as HTMLElement).previousElementSibling;
+    this.resizeTo((chat?.getBoundingClientRect().width ?? 0) + step);
+  }
+
+  /** The chat stays wide enough for its input, the dashboard for one tile. */
+  private resizeTo(width: number): void {
+    const max = Math.max(360, window.innerWidth - 420);
+    this.chatWidth.set(Math.round(Math.min(Math.max(width, 360), max)));
   }
 }

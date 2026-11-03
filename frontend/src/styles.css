@@ -69,3 +69,10 @@ button:focus-visible {
 copilot-chat-user-message-renderer[class] {
   white-space: pre-line;
 }
+
+/* A narrow chat cuts the placeholder off at the end instead of wrapping it into a second, clipped line. */
+app-chat-panel textarea::placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

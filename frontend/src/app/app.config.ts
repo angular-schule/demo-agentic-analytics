@@ -9,7 +9,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(),
     provideCopilotKit(copilotKitConfig),
     provideCopilotChatLabels({
-      chatInputPlaceholder: 'Ask about sales, products or regions …',
+      chatInputPlaceholder: 'Ask about the sales data …',
       welcomeMessageText: 'What would you like to know about Adventure Works sales?',
       chatDisclaimerText: 'Answers come from the sales data. The assistant has no access to personal data.',
     }),

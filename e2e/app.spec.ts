@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 const FAKE_LLM = process.env['FAKE_LLM_URL'] ?? 'http://127.0.0.1:4000';
 
 async function ask(page: Page, question: string): Promise<void> {
-  const input = page.getByRole('textbox', { name: 'Ask about sales, products or regions …' });
+  const input = page.getByRole('textbox', { name: 'Ask about the sales data …' });
   await input.fill(question);
   await input.press('Enter');
 }

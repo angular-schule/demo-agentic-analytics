@@ -73,8 +73,39 @@ h1 {
 
 main {
   display: grid;
-  grid-template-columns: minmax(22rem, 30rem) 1fr;
+  grid-template-columns: var(--chat-width, minmax(22rem, 30rem)) auto 1fr;
   min-height: 0;
+}
+
+/* The edge between chat and dashboard: drag it, or focus it and use the arrow keys. */
+main > .resize {
+  position: relative;
+  width: 0.6rem;
+  margin: 0 -0.3rem;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+main > .resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--border-color);
+  transform: translate(-50%, -50%);
+}
+
+main > .resize:hover::after,
+main > .resize:focus-visible::after {
+  background: var(--brand-strong);
+}
+
+main > .resize:focus-visible {
+  outline: none;
 }
 
 @media (max-width: 860px) {
@@ -84,6 +115,10 @@ main {
 
   main {
     grid-template-columns: 1fr;
+  }
+
+  main > .resize {
+    display: none;
   }
 
   app-chat-panel {
