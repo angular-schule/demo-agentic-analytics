@@ -157,8 +157,12 @@ export class TrafficPanel {
     event.preventDefault();
     const handle = event.currentTarget as HTMLElement;
     handle.setPointerCapture(event.pointerId);
+    // Without this, dragging selects the text of the whole page on the way.
+    const root = document.documentElement;
+    root.style.userSelect = 'none';
     const move = (e: PointerEvent) => this.resizeTo(window.innerHeight - e.clientY - this.chromeHeight());
     const stop = () => {
+      root.style.userSelect = '';
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', stop);
       handle.removeEventListener('pointercancel', stop);
