@@ -186,7 +186,9 @@ export class TrafficPanel {
       return;
     }
     this.open.set(true);
-    this.height.set(Math.round(Math.min(bodyHeight, window.innerHeight * 0.8)));
+    // The chat above keeps room for its example questions, a message and the input field.
+    const max = Math.max(120, window.innerHeight - 520);
+    this.height.set(Math.round(Math.min(bodyHeight, max)));
   }
 
   /** Everything of the window above its body: the drag handle and the header. */
