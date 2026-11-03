@@ -25,13 +25,13 @@ test('every answer says that no real model is behind it', () => {
 });
 
 test('the example questions of the app', () => {
-  assert.deepEqual(ask('How did revenue develop per quarter, split by sales channel?').input.query, {
+  assert.deepEqual(ask('How did revenue develop per quarter, split by sales channel? Show it as a line chart.').input.query, {
     measures: ['revenue'],
     groupBy: ['year', 'quarter', 'channel'],
   });
-  assert.equal(ask('How did revenue develop per quarter, split by sales channel?').input.chart, 'line');
+  assert.equal(ask('How did revenue develop per quarter, split by sales channel? Show it as a line chart.').input.chart, 'line');
 
-  assert.deepEqual(ask('Which 10 resellers in Germany bought the most? Show revenue and margin.').input.query, {
+  assert.deepEqual(ask('Which 10 resellers in Germany bought the most? Show revenue and margin as a bar chart.').input.query, {
     measures: ['revenue', 'margin'],
     groupBy: ['reseller'],
     filters: [{ dimension: 'country', operator: 'eq', values: ['Germany'] }],
@@ -48,13 +48,19 @@ test('the example questions of the app', () => {
     ],
   });
 
+  assert.deepEqual(ask('What were the total revenue, margin and orders in 2013? Show all three as key figures in one view.').input, {
+    title: 'Revenue, margin and orders, 2013',
+    chart: 'kpi',
+    query: { measures: ['revenue', 'margin', 'orders'], filters: [{ dimension: 'year', operator: 'eq', values: [2013] }] },
+  });
+  assert.equal(ask('How much discount did each promotion type grant, and how much revenue came with it? Show it as a table.').input.chart, 'table');
   assert.deepEqual(ask('Show me the Mountain-200 bikes.'), {
     text: 'Demo mode, no real LLM: I search the catalogue for "Mountain-200".',
     tool: 'findProducts',
     input: { search: 'Mountain-200', limit: 8 },
   });
 
-  assert.deepEqual(ask('How much discount did each promotion type grant, and how much revenue came with it?').input.query, {
+  assert.deepEqual(ask('How much discount did each promotion type grant, and how much revenue came with it? Show it as a table.').input.query, {
     measures: ['discount', 'revenue'],
     groupBy: ['promotionType'],
   });

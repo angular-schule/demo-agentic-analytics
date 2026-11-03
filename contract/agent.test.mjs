@@ -268,14 +268,15 @@ for (const [format, dotnetAgent, nodeAgent] of [
 }
 
 const EXAMPLES = [
-  'How did revenue develop per quarter, split by sales channel?',
-  'Which 10 resellers in Germany bought the most? Show revenue and margin.',
+  'What can you do for me?',
+  'How did revenue develop per quarter, split by sales channel? Show it as a line chart.',
+  'What were the total revenue, margin and orders in 2013? Show all three as key figures in one view.',
+  'Which 10 resellers in Germany bought the most? Show revenue and margin as a bar chart.',
   'Compare the gross margin of the product categories in Europe in 2013.',
-  'How much discount did each promotion type grant, and how much revenue came with it?',
   'Do larger resellers place bigger orders? Show only the average order value per reseller annual revenue class.',
+  'How much discount did each promotion type grant, and how much revenue came with it? Show it as a table.',
   'Show me the Mountain-200 bikes.',
   'Who is Brakes and Gears, and where are they located?',
-  'What can you do for me?',
   'Who is the key account manager of our biggest reseller?',
 ];
 const WITHOUT_TOOL = ['What can you do for me?', 'Who is the key account manager of our biggest reseller?'];
