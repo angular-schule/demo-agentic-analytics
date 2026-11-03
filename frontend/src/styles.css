@@ -60,3 +60,12 @@ button:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
+
+/*
+ * CopilotKit writes the user's message with a space before and after it and keeps white space as typed
+ * (pre-wrap), so the bubble starts with a blank. pre-line still keeps the user's line breaks, but drops
+ * the spaces at the start and end of a line.
+ */
+copilot-chat-user-message-renderer[class] {
+  white-space: pre-line;
+}
