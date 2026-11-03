@@ -71,13 +71,6 @@ h1 {
   background: var(--status-critical);
 }
 
-.dot.privacy {
-  width: 0.65rem;
-  height: 0.75rem;
-  border-radius: 0.3rem 0.3rem 0.35rem 0.35rem / 0.25rem 0.25rem 0.5rem 0.5rem;
-  background: var(--brand);
-}
-
 main {
   display: grid;
   grid-template-columns: minmax(22rem, 30rem) 1fr;

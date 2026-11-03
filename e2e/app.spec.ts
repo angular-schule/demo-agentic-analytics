@@ -30,7 +30,7 @@ test('the header names backend, agent and model', async ({ page }) => {
   const status = page.getByRole('list', { name: 'Status' });
   await expect(status).toContainText(backends[health.backend]);
   await expect(status).toContainText(`${agent.framework} · ${agent.model}`);
-  await expect(status).toContainText('No personal data');
+  await expect(status).not.toContainText('Scope');
 });
 
 test('a question becomes a chart, and the agent comments on it', async ({ page }) => {

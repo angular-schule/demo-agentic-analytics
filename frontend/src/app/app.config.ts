@@ -11,7 +11,7 @@ export const appConfig: ApplicationConfig = {
     provideCopilotChatLabels({
       chatInputPlaceholder: 'Ask about sales, products or regions …',
       welcomeMessageText: 'What would you like to know about Adventure Works sales?',
-      chatDisclaimerText: 'Answers come from the sales data. Personal data is not part of the model.',
+      chatDisclaimerText: 'Answers come from the sales data. The assistant has no access to personal data.',
     }),
     provideAppInitializer(registerDashboardTool),
   ],

@@ -24,9 +24,6 @@ const BACKENDS: Record<DataBackendHealth['backend'], string> = {
         </div>
       </div>
       <ul class="status" aria-label="Status">
-        <li title="Personal data such as sales representatives and contact persons is not part of the data model.">
-          <span class="dot privacy" aria-hidden="true"></span>No personal data
-        </li>
         <li>
           <span class="dot" [class.ok]="health.hasValue()" [class.down]="health.error()" aria-hidden="true"></span>
           {{ backend() }}
@@ -69,10 +66,11 @@ export class App {
 
   protected readonly debugTraffic = computed(() => this.agent.hasValue() && this.agent.value().debugTraffic === true);
 
+  /** Shown only when DATA_SCOPE restricts the data to one territory group. */
   protected readonly scope = computed(() => {
     if (!this.health.hasValue()) return null;
     const scope = this.health.value().scope;
-    return scope === '*' ? 'all territories' : scope;
+    return scope === '*' ? null : scope;
   });
 
   constructor() {
