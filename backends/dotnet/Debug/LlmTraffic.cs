@@ -25,10 +25,6 @@ public sealed class LlmTrafficLog
     private readonly List<ChannelWriter<LlmExchange>> listeners = [];
     private int nextId;
 
-    // Anything that reads as "no" switches it off, so a typo never leaves it on by accident.
-    public static bool Enabled(IConfiguration configuration) =>
-        configuration["DEBUG_TRAFFIC"]?.Trim().ToLowerInvariant() is not ("off" or "false" or "0" or "no");
-
     public LlmExchange Start(string method, string url, JsonElement? request)
     {
         var exchange = new LlmExchange(Interlocked.Increment(ref nextId), DateTimeOffset.UtcNow, method, url, request);

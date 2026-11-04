@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AgenticAnalytics.Api;
 using AgenticAnalytics.Api.Agent;
 using AgenticAnalytics.Api.Data;
 using AgenticAnalytics.Api.Debug;
@@ -12,6 +13,7 @@ using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenAI;
 
@@ -19,13 +21,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Analytics")
     ?? throw new InvalidOperationException("ConnectionStrings__Analytics is not set.");
-var scope = DataScope.Parse(builder.Configuration["DATA_SCOPE"]);
 
-builder.Services.AddSingleton(scope);
-builder.Services.AddDbContext<AnalyticsContext>(options => options
+builder.Services.AddOptions<AppSettings>()
+    .Bind(builder.Configuration)
+    .Validate(s => s.DataScope is not null && DataScope.Allowed.Contains(s.DataScope), $"DATA_SCOPE must be one of: {string.Join(", ", DataScope.Allowed)}.")
+    .ValidateOnStart();
+builder.Services.AddSingleton(sp => DataScope.Parse(sp.GetRequiredService<IOptions<AppSettings>>().Value.DataScope));
+builder.Services.AddDbContext<AnalyticsContext>((sp, options) => options
     .UseSqlServer(connectionString)
     .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
-    .AddInterceptors(new DataScopeInterceptor(scope.TerritoryGroup)));
+    .AddInterceptors(new DataScopeInterceptor(sp.GetRequiredService<DataScope>().TerritoryGroup)));
 builder.Services.AddScoped<SalesAggregator>();
 builder.Services.AddSingleton<SchemaService>();
 builder.Services.AddProblemDetails();
@@ -94,7 +99,8 @@ app.MapGroup("/api").WithTags("catalog").MapCatalogEndpoints();
 
 // The agent runs in this process when a model is configured: AG-UI under /agent, like the separate
 // Mastra service, so the Angular app does not notice which one answers.
-var model = ModelSettings.Read(app.Configuration, out var reason);
+var settings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
+var model = ModelSettings.From(settings, out var reason);
 if (model is null)
 {
     app.Logger.LogWarning("The agent is not served by this backend: {Reason}", reason);
@@ -103,7 +109,7 @@ else
 {
     var schema = await app.Services.GetRequiredService<SchemaService>().WaitForSchemaAsync(app.Logger);
     // DEBUG ONLY: records the traffic to the LLM provider for the demo's traffic window (DEBUG_TRAFFIC=off switches it off).
-    var debugTraffic = LlmTrafficLog.Enabled(app.Configuration);
+    var debugTraffic = settings.DebugTrafficEnabled;
     var trafficLog = new LlmTrafficLog();
     var recorder = debugTraffic ? new LlmTrafficHandler(trafficLog) : null;
     var chatClient = model.Provider == "anthropic" ? AnthropicChatClient(model, recorder) : OpenAIChatClient(model, recorder);
@@ -145,23 +151,22 @@ static IChatClient OpenAIChatClient(ModelSettings model, DelegatingHandler? reco
 }
 
 /// <param name="Id">As in the Mastra agent: provider, slash, model, e.g. anthropic/claude-sonnet-5-5 or mistral/mistral-large-latest.</param>
-/// <param name="BaseUrl">The provider's API; the variables are the ones Mastra reads, so both tracks share agent/.env.</param>
+/// <param name="BaseUrl">The provider's API, from its base URL setting or the provider's default.</param>
 internal sealed record ModelSettings(string Id, string Provider, string Name, string ApiKey, string BaseUrl)
 {
-    private sealed record ProviderInfo(string ApiKey, string BaseUrlVariable, string DefaultBaseUrl, string Suffix = "");
+    private sealed record ProviderInfo(string ApiKeyVariable, Func<AppSettings, string?> ApiKey, Func<AppSettings, string?> BaseUrl, string DefaultBaseUrl, string Suffix = "");
 
     private static readonly Dictionary<string, ProviderInfo> Providers = new()
     {
-        ["anthropic"] = new("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1"),
-        ["openai"] = new("OPENAI_API_KEY", "OPENAI_BASE_URL", "https://api.openai.com/v1"),
-        // GOOGLE_BASE_URL is the address of the Gemini API, as for Mastra; its OpenAI-compatible endpoint is below it.
-        ["google"] = new("GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta", "/openai"),
-        ["mistral"] = new("MISTRAL_API_KEY", "MISTRAL_BASE_URL", "https://api.mistral.ai/v1"),
+        ["anthropic"] = new("ANTHROPIC_API_KEY", s => s.AnthropicApiKey, s => s.AnthropicBaseUrl, "https://api.anthropic.com/v1"),
+        ["openai"] = new("OPENAI_API_KEY", s => s.OpenAIApiKey, s => s.OpenAIBaseUrl, "https://api.openai.com/v1"),
+        ["google"] = new("GOOGLE_GENERATIVE_AI_API_KEY", s => s.GoogleApiKey, s => s.GoogleBaseUrl, "https://generativelanguage.googleapis.com/v1beta", "/openai"),
+        ["mistral"] = new("MISTRAL_API_KEY", s => s.MistralApiKey, s => s.MistralBaseUrl, "https://api.mistral.ai/v1"),
     };
 
-    public static ModelSettings? Read(IConfiguration configuration, out string reason)
+    public static ModelSettings? From(AppSettings settings, out string reason)
     {
-        var id = configuration["MODEL"] ?? "anthropic/claude-sonnet-5-5";
+        var id = settings.Model;
         reason = "";
         var name = id.Split('/')[0];
         if (!Providers.TryGetValue(name, out var provider) || id.Length <= name.Length + 1)
@@ -169,12 +174,12 @@ internal sealed record ModelSettings(string Id, string Provider, string Name, st
             reason = $"MODEL '{id}' names no known provider: anthropic, openai, google or mistral.";
             return null;
         }
-        if (configuration[provider.ApiKey] is not { Length: > 0 } apiKey)
+        if (provider.ApiKey(settings) is not { Length: > 0 } apiKey)
         {
-            reason = $"{provider.ApiKey} is not set.";
+            reason = $"{provider.ApiKeyVariable} is not set.";
             return null;
         }
-        var baseUrl = configuration[provider.BaseUrlVariable] is { Length: > 0 } url ? url : provider.DefaultBaseUrl;
+        var baseUrl = provider.BaseUrl(settings) is { Length: > 0 } url ? url : provider.DefaultBaseUrl;
         return new ModelSettings(id, name, id[(name.Length + 1)..], apiKey, baseUrl.TrimEnd('/') + provider.Suffix);
     }
 }
