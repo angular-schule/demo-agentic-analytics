@@ -3,12 +3,12 @@
 Ask a sales database questions in plain language and get charts back, right inside an Angular app.
 Pin the answers you like to a dashboard that keeps working without the LLM.
 
-The demo accompanies the article series **Agentic Analytics with Angular** on angular.schule:
+The demo accompanies the article series **Agentic Analytics with Angular** for angular.schule. The articles are not published yet; the links lead to the drafts in [pull request #62](https://github.com/angular-schule/website-articles/pull/62):
 
-1. [Architecture, and Keeping Personal Data Out](https://angular.schule/blog/2026-11-agentic-analytics)
-2. The backend, in one of two variants: [Node.js with Mastra](https://angular.schule/blog/2026-11-agentic-analytics-node) or [.NET with the Microsoft Agent Framework](https://angular.schule/blog/2026-11-agentic-analytics-dotnet)
-3. [Generative UI with CopilotKit](https://angular.schule/blog/2026-11-agentic-analytics-angular)
-4. [Compare, Watch and Fine-Tune the Agent](https://angular.schule/blog/2026-11-agentic-analytics-in-practice)
+1. [Architecture, and Keeping Personal Data Out](https://github.com/angular-schule/website-articles/blob/agentic-analytics/blog/2026-11-agentic-analytics/README.md)
+2. The backend, in one of two variants: [Node.js with Mastra](https://github.com/angular-schule/website-articles/blob/agentic-analytics/blog/2026-11-agentic-analytics-node/README.md) or [.NET with the Microsoft Agent Framework](https://github.com/angular-schule/website-articles/blob/agentic-analytics/blog/2026-11-agentic-analytics-dotnet/README.md)
+3. [Generative UI with CopilotKit](https://github.com/angular-schule/website-articles/blob/agentic-analytics/blog/2026-11-agentic-analytics-angular/README.md)
+4. [Compare, Watch and Fine-Tune the Agent](https://github.com/angular-schule/website-articles/blob/agentic-analytics/blog/2026-11-agentic-analytics-in-practice/README.md)
 
 It was inspired by Manfred Steyer's live-coding workshop *Build an Agentic Analytics App with Angular* ([his demo](https://github.com/manfredsteyer/agentic-sales)) and rebuilt with its own data, its own backends and a strong focus on data protection.
 
