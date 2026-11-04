@@ -103,7 +103,28 @@ var settings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
 var model = ModelSettings.From(settings, out var reason);
 if (model is null)
 {
-    app.Logger.LogWarning("The agent is not served by this backend: {Reason}", reason);
+    // The backend still starts: the dashboard works without the model, and the chat says what is missing.
+    app.Logger.LogWarning("The agent cannot answer: {Reason}", reason);
+    app.MapGet("/agent/info", () => new { framework = "Microsoft Agent Framework", model = settings.Model, debugTraffic = false, problem = reason }).ExcludeFromDescription();
+    app.MapPost($"/agent/ag-ui/{AnalystAgent.Id}", async (JsonElement input, HttpResponse response) =>
+    {
+        var threadId = input.GetProperty("threadId").GetString();
+        var runId = input.GetProperty("runId").GetString();
+        var messageId = Guid.NewGuid().ToString();
+        object[] events =
+        [
+            new { type = "RUN_STARTED", threadId, runId },
+            new { type = "TEXT_MESSAGE_START", messageId, role = "assistant" },
+            new { type = "TEXT_MESSAGE_CONTENT", messageId, delta = $"The agent is not set up yet. {reason}" },
+            new { type = "TEXT_MESSAGE_END", messageId },
+            new { type = "RUN_FINISHED", threadId, runId },
+        ];
+        response.ContentType = "text/event-stream";
+        foreach (var e in events)
+        {
+            await response.WriteAsync($"data: {JsonSerializer.Serialize(e)}\n\n");
+        }
+    }).ExcludeFromDescription();
 }
 else
 {
@@ -171,12 +192,12 @@ internal sealed record ModelSettings(string Id, string Provider, string Name, st
         var name = id.Split('/')[0];
         if (!Providers.TryGetValue(name, out var provider) || id.Length <= name.Length + 1)
         {
-            reason = $"MODEL '{id}' names no known provider: anthropic, openai, google or mistral.";
+            reason = $"MODEL={id} names no provider this demo supports (anthropic, openai, google, mistral). Set MODEL in agent/.env, see agent/.env.example, and restart.";
             return null;
         }
         if (provider.ApiKey(settings) is not { Length: > 0 } apiKey)
         {
-            reason = $"{provider.ApiKeyVariable} is not set.";
+            reason = $"MODEL={id} needs {provider.ApiKeyVariable}. Add it to agent/.env, see agent/.env.example, and restart.";
             return null;
         }
         var baseUrl = provider.BaseUrl(settings) is { Length: > 0 } url ? url : provider.DefaultBaseUrl;

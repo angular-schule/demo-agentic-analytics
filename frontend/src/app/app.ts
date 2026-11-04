@@ -28,8 +28,8 @@ const BACKENDS: Record<DataBackendHealth['backend'], string> = {
           <span class="dot" [class.ok]="health.hasValue()" [class.down]="health.error()" aria-hidden="true"></span>
           {{ backend() }}
         </li>
-        <li>
-          <span class="dot" [class.ok]="agent.hasValue()" [class.down]="agent.error()" aria-hidden="true"></span>
+        <li [attr.title]="agentProblem()">
+          <span class="dot" [class.ok]="agent.hasValue() && !agentProblem()" [class.down]="agent.error() || agentProblem()" aria-hidden="true"></span>
           {{ model() }}
         </li>
         @if (scope(); as scope) {
@@ -70,9 +70,11 @@ export class App {
 
   protected readonly model = computed(() => {
     if (!this.agent.hasValue()) return this.agent.error() ? 'Agent offline' : 'Agent …';
-    const { framework, model } = this.agent.value();
-    return `${framework} · ${model}`;
+    const { framework, model, problem } = this.agent.value();
+    return problem ? `${framework} · ${model} · not set up` : `${framework} · ${model}`;
   });
+
+  protected readonly agentProblem = computed(() => (this.agent.hasValue() ? this.agent.value().problem : undefined));
 
   protected readonly debugTraffic = computed(() => this.agent.hasValue() && this.agent.value().debugTraffic === true);
 

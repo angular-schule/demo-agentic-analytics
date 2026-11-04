@@ -58,4 +58,6 @@ export interface AgentInfo {
   model: string;
   /** DEBUG ONLY: whether the agent records its traffic for the traffic window (DEBUG_TRAFFIC). */
   debugTraffic?: boolean;
+  /** Why the model cannot answer, e.g. a missing API key; the chat then answers with this text. */
+  problem?: string;
 }

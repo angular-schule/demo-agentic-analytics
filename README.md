@@ -101,6 +101,8 @@ MODEL=google/gemini-3-flash-preview   # GOOGLE_GENERATIVE_AI_API_KEY
 MODEL=mistral/mistral-large-latest    # MISTRAL_API_KEY, optional MISTRAL_BASE_URL=https://api.eu.mistral.ai/v1 for processing in the EU
 ```
 
+If the key for the chosen model is missing, the app still starts and the dashboard keeps working. The header shows the agent as "not set up", and the chat answers with the variable that is missing and where it belongs.
+
 ### Restricting the data
 
 `DATA_SCOPE` in `.env` limits what the backends may see: `*` for everything, or one territory group (`Europe`, `North America`, `Pacific`).

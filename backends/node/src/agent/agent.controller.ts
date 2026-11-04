@@ -2,13 +2,14 @@ import { EventType, type BaseEvent } from '@ag-ui/client';
 import { RunAgentInputSchema } from '@ag-ui/core/schemas';
 import { MastraAgent } from '@ag-ui/mastra';
 import { Agent } from '@mastra/core/agent';
-import { BadRequestException, Body, Controller, Get, NotFoundException, Post, Res } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, Body, Controller, Get, Logger, NotFoundException, Post, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 import { searchProducts, searchResellers } from '../catalog/catalog.controller';
 import { DrizzleService } from '../db/drizzle.service';
-import { EnvironmentVariables } from '../env.config';
+import { EnvironmentVariables, modelProblem } from '../env.config';
 import { SalesAggregatorService } from '../semantic/sales-aggregator.service';
 import { SchemaService } from '../semantic/schema.service';
 import { debugTraffic, streamLlmTraffic } from '../debug/llm-traffic';
@@ -27,6 +28,8 @@ const AGENT_ID = 'analyst';
 export class AgentController {
   private analyst?: Promise<Agent>;
   private readonly model: string;
+  /** Set when the model cannot run, e.g. without its API key: the chat answers with it instead. */
+  private readonly problem?: string;
 
   constructor(
     private readonly schema: SchemaService,
@@ -35,11 +38,13 @@ export class AgentController {
     config: ConfigService<EnvironmentVariables, true>,
   ) {
     this.model = config.get('MODEL', { infer: true });
+    this.problem = modelProblem(this.model, (variable) => config.get(variable, { infer: true }));
+    if (this.problem) new Logger('Agent').warn(`The agent cannot answer: ${this.problem}`);
   }
 
   @Get('info')
-  info(): { framework: string; model: string; debugTraffic: boolean } {
-    return { framework: 'Mastra', model: this.model, debugTraffic };
+  info(): { framework: string; model: string; debugTraffic: boolean; problem?: string } {
+    return { framework: 'Mastra', model: this.model, debugTraffic, problem: this.problem };
   }
 
   /** DEBUG ONLY: what the agent sends to the LLM provider and what comes back, as server-sent events. */
@@ -55,6 +60,14 @@ export class AgentController {
     const parsed = RunAgentInputSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(`Expected an AG-UI RunAgentInput: ${parsed.error.message}`);
     const input = parsed.data;
+
+    if (this.problem) {
+      const response = reply.hijack().raw;
+      response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+      for (const event of explanation(input.threadId, input.runId, this.problem)) response.write(`data: ${JSON.stringify(event)}\n\n`);
+      response.end();
+      return;
+    }
 
     const agent = new MastraAgent({
       agentId: AGENT_ID,
@@ -118,4 +131,16 @@ export class AgentController {
     );
     return this.analyst;
   }
+}
+
+/** A run without the model: one assistant message that says what is missing, as the chat shows any answer. */
+function explanation(threadId: string, runId: string, problem: string): BaseEvent[] {
+  const messageId = randomUUID();
+  return [
+    { type: EventType.RUN_STARTED, threadId, runId },
+    { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: `The agent is not set up yet. ${problem}` },
+    { type: EventType.TEXT_MESSAGE_END, messageId },
+    { type: EventType.RUN_FINISHED, threadId, runId },
+  ] as BaseEvent[];
 }

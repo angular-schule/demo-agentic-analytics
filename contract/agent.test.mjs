@@ -2,7 +2,8 @@
 // separate service) answers the same AG-UI requests against the fake LLM in contract/fake-llm.mjs,
 // with an Anthropic model, for both backends with a model in OpenAI's Chat Completions format, and
 // Mastra with an OpenAI model, which it calls through OpenAI's Responses API. At the end, both
-// backends answer the app's example questions with the demo model (demo-model/demo.mjs).
+// backends answer the app's example questions with the demo model (demo-model/demo.mjs), and both
+// say in the chat which API key is missing when it is not set.
 // Run with the test setup from compose.test.yaml:  node --test 'contract/*.test.mjs'
 // DOTNET_API_URL, NODE_API_URL, AGENT_SERVICE_URL and FAKE_LLM_URL default to the ports from compose.
 import assert from 'node:assert/strict';
@@ -298,5 +299,31 @@ for (const [name, base] of Object.entries(demoAgents)) {
         assert.equal(ofType(events, 'TOOL_CALL_RESULT').length, WITHOUT_TOOL.includes(question) ? 0 : 1);
       });
     }
+  });
+}
+
+const agentsWithoutKey = {
+  'Microsoft Agent Framework': process.env.DOTNET_NOKEY_URL ?? 'http://127.0.0.1:8088',
+  Mastra: process.env.NODE_NOKEY_URL ?? 'http://127.0.0.1:8089',
+};
+const MISSING_KEY = 'MODEL=mistral/mistral-large-latest needs MISTRAL_API_KEY. Add it to agent/.env, see agent/.env.example, and restart.';
+
+for (const [name, base] of Object.entries(agentsWithoutKey)) {
+  describe(`${name} without the API key`, () => {
+    test('starts, and the header learns what is missing', async () => {
+      const info = await (await fetch(`${base}/agent/info`)).json();
+      assert.equal(info.problem, MISSING_KEY);
+    });
+
+    test('answers in the chat which variable to set and where', async () => {
+      const events = await run(base, 'How did revenue develop per year?');
+      assert.deepEqual(events.map((e) => e.type), ['RUN_STARTED', 'TEXT_MESSAGE_START', 'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END', 'RUN_FINISHED']);
+      assert.equal(text(events), `The agent is not set up yet. ${MISSING_KEY}`);
+    });
+
+    test('still serves the dashboard', async () => {
+      const response = await fetch(`${base}/api/health`);
+      assert.equal(response.status, 200);
+    });
   });
 }

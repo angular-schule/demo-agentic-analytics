@@ -128,3 +128,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Both backends with a model whose API key is missing: they start, and the chat says what to set.
+  dotnet-api-nokey:
+    profiles: [dotnet]
+    build: backends/dotnet
+    environment:
+      ConnectionStrings__Analytics: Server=sqlserver;Database=AdventureWorksDW;User Id=AnalyticsReader;Password=${ANALYTICS_READER_PASSWORD};TrustServerCertificate=True
+      DATA_SCOPE: "*"
+      MODEL: mistral/mistral-large-latest
+    ports:
+      - 127.0.0.1:8088:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  node-api-nokey:
+    profiles: [node]
+    build: backends/node
+    environment:
+      DATABASE_URL: postgres://analytics_reader:${ANALYTICS_READER_PASSWORD}@postgres:5432/adventureworks
+      DATA_SCOPE: "*"
+      MODEL: mistral/mistral-large-latest
+    ports:
+      - 127.0.0.1:8089:8080
+    depends_on:
+      postgres:
+        condition: service_healthy

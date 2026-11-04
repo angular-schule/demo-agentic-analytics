@@ -1,10 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { randomUUID } from 'node:crypto';
 import { EventType, type BaseEvent } from '@ag-ui/client';
 import { RunAgentInputSchema } from '@ag-ui/core/schemas';
 import { MastraAgent } from '@ag-ui/mastra';
 import { Agent } from '@mastra/core/agent';
-import { ALLOWED_ORIGIN, DATA_API_URL, HOST, MODEL, PORT } from './config.ts';
+import { ALLOWED_ORIGIN, DATA_API_URL, HOST, MODEL, MODEL_PROBLEM, PORT } from './config.ts';
 import { dataApi, type SalesSchema } from './data-api.ts';
 import { debugTraffic, startLlmTrafficProxy, streamLlmTraffic } from './llm-traffic.ts';
 import { createInstructions } from './instructions.ts';
@@ -41,6 +42,13 @@ async function runAgent(request: IncomingMessage, response: ServerResponse): Pro
     return sendJson(response, 400, { error: `Expected an AG-UI RunAgentInput: ${parsed.error.message}` });
   }
   const input = parsed.data;
+
+  if (MODEL_PROBLEM) {
+    response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+    for (const event of explanation(input.threadId, input.runId, MODEL_PROBLEM)) response.write(`data: ${JSON.stringify(event)}\n\n`);
+    response.end();
+    return;
+  }
 
   const agent = new MastraAgent({
     agentId: AGENT_ID,
@@ -85,7 +93,7 @@ const server = createServer((request, response) => {
   if (request.method === 'OPTIONS') {
     response.writeHead(204).end();
   } else if (request.method === 'GET' && path === '/agent/info') {
-    sendJson(response, 200, { framework: 'Mastra', model: MODEL, debugTraffic });
+    sendJson(response, 200, { framework: 'Mastra', model: MODEL, debugTraffic, problem: MODEL_PROBLEM });
   } else if (request.method === 'GET' && path === '/agent/debug/llm' && debugTraffic) {
     streamLlmTraffic(response);
   } else if (request.method === 'POST' && path === `/agent/ag-ui/${AGENT_ID}`) {
@@ -100,6 +108,7 @@ const server = createServer((request, response) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Agent "${AGENT_ID}" with ${MODEL} on http://${HOST}:${PORT}, data from ${DATA_API_URL}`);
+  if (MODEL_PROBLEM) console.warn(`The agent cannot answer: ${MODEL_PROBLEM}`);
 });
 
 /** The backend may still be importing when the agent starts, so the schema is retried. */
@@ -132,4 +141,16 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
   } catch {
     return undefined;
   }
+}
+
+/** A run without the model: one assistant message that says what is missing, as the chat shows any answer. */
+function explanation(threadId: string, runId: string, problem: string): BaseEvent[] {
+  const messageId = randomUUID();
+  return [
+    { type: EventType.RUN_STARTED, threadId, runId },
+    { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' },
+    { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: `The agent is not set up yet. ${problem}` },
+    { type: EventType.TEXT_MESSAGE_END, messageId },
+    { type: EventType.RUN_FINISHED, threadId, runId },
+  ] as BaseEvent[];
 }

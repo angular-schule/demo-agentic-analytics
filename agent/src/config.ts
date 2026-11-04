@@ -8,6 +8,31 @@ process.env['MASTRA_TELEMETRY_DISABLED'] ??= '1';
  */
 export const MODEL = process.env['MODEL'] ?? 'anthropic/claude-sonnet-5-5';
 
+const API_KEYS: Record<string, string | undefined> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+};
+
+/**
+ * Why the agent cannot run with this model, in words for whoever starts the demo; undefined when it can.
+ * The service still starts, and the chat shows this text.
+ */
+export function modelProblem(model: string, env: Record<string, string | undefined>): string | undefined {
+  const [provider = ''] = model.split('/');
+  const variable = API_KEYS[provider];
+  if (!variable || model.length <= provider.length + 1) {
+    return `MODEL=${model} names no provider this demo supports (anthropic, openai, google, mistral). Set MODEL in agent/.env, see agent/.env.example, and restart.`;
+  }
+  if (!env[variable]) {
+    return `MODEL=${model} needs ${variable}. Add it to agent/.env, see agent/.env.example, and restart.`;
+  }
+  return undefined;
+}
+
+export const MODEL_PROBLEM = modelProblem(MODEL, process.env);
+
 /** Base URL of the backend (.NET or Node, same contract). */
 export const DATA_API_URL = (process.env['DATA_API_URL'] ?? 'http://127.0.0.1:8081').replace(/\/$/, '');
 
